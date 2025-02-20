@@ -1,7 +1,12 @@
-/* eslint-disable prettier/prettier */
 import './assets/main.css'
 
 import { createApp } from 'vue'
 import App from './App.vue'
+// 路由
+import router from './router'
+// pinia
 
-createApp(App).mount('#app')
+import { createPinia } from 'pinia'
+
+const app = createApp(App)
+app.use(router).use(createPinia()).mount('#app')

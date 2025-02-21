@@ -1,42 +1,36 @@
 <template>
-    <div class="home">
-        <h1>欢迎使用车辆零部件表面缺陷检测系统</h1>
-        <p>请选择操作：</p>
-        <router-link to="/checking">
-            <button>开始检测</button>
-        </router-link>
-        <router-link to="/mydata">
-            <button>我的数据</button>
-        </router-link>
-        <router-link to="/report">
-            <button>查看报告</button>
-        </router-link>
-    </div>
+    <a-list item-layout="horizontal" :data-source="data">
+        <template #renderItem="{ item }">
+            <a-list-item>
+                <a-list-item-meta
+                    description="Ant Design, a design language for background applications, is refined by Ant UED Team">
+                    <template #title>
+                        <a href="#">{{ item.title }}</a>
+                    </template>
+                    <template #avatar>
+                        <a-avatar src="#" />
+                    </template>
+                </a-list-item-meta>
+            </a-list-item>
+        </template>
+    </a-list>
 </template>
-
-<script setup>
-// 这个页面可以作为应用的主页，展示一些基本信息和导航链接
+<script lang="ts" setup>
+interface DataItem {
+    title: string;
+}
+const data: DataItem[] = [
+    {
+        title: 'Ant Design Title 1',
+    },
+    {
+        title: 'Ant Design Title 2',
+    },
+    {
+        title: 'Ant Design Title 3',
+    },
+    {
+        title: 'Ant Design Title 4',
+    },
+];
 </script>
-
-<style scoped>
-.home {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-}
-
-button {
-    margin: 10px;
-    padding: 10px 20px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    cursor: pointer;
-}
-
-button:hover {
-    background-color: #45a049;
-}
-</style>

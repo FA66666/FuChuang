@@ -1,51 +1,72 @@
 <template>
-  <div id="app">
-    <!-- 导航栏 -->
-    <div class="sidebar">
-      <router-link to="/" class="menu-item">首页</router-link>
-      <router-link to="/checking" class="menu-item">检测</router-link>
-      <router-link to="/mydata" class="menu-item">我的数据</router-link>
-      <router-link to="/report" class="menu-item">报告</router-link>
-    </div>
-    <!-- 这里渲染路由的内容 -->
-    <router-view class="main-content"></router-view>
-  </div>
+  <a-layout>
+    <!-- Header with top navigation -->
+    <a-layout-header :style="{ position: 'fixed', zIndex: 1, width: '100%' }">
+      <div class="logo" />
+      <a-menu theme="dark" mode="horizontal" v-model:selectedKeys="selectedKeys" :style="{ lineHeight: '64px' }">
+        <a-menu-item key="1" @click="goHome">首页</a-menu-item>
+        <a-menu-item key="2" @click="goChecking">检测</a-menu-item>
+        <a-menu-item key="3" @click="goMyData">我的数据</a-menu-item>
+        <a-menu-item key="4" @click="goReport">报告</a-menu-item>
+      </a-menu>
+    </a-layout-header>
+
+    <a-layout>
+      <a-layout-content :style="{ padding: '0 50px', marginTop: '80px', minHeight: 'calc(100vh - 64px)' }">
+
+        <!-- Router view to display content based on the current route -->
+        <router-view class="main-content"></router-view>
+      </a-layout-content>
+    </a-layout>
+  </a-layout>
 </template>
 
-<script setup>
-// 这里可以进行一些初始化操作
+<script lang="ts" setup>
+import { ref } from 'vue';
+import { useRouter } from 'vue-router';  // 引入 vue-router
+
+const router = useRouter();  // 使用 useRouter 获取路由实例
+const selectedKeys = ref<string[]>(['1']);  // 默认选中 "首页"
+
+// 路由跳转方法
+const goHome = () => {
+  router.push('/');  // 跳转到首页
+};
+const goChecking = () => {
+  router.push('/checking');  // 跳转到检测
+};
+const goMyData = () => {
+  router.push('/mydata');  // 跳转到我的数据
+};
+const goReport = () => {
+  router.push('/report');  // 跳转到报告
+};
+
+
 </script>
 
 <style scoped>
-#app {
-  display: flex;
-  height: 100vh;
-  font-family: Arial, sans-serif;
+html,
+body {
+  height: 100%;
+  /* 使 html 和 body 元素的高度为 100% */
+  margin: 0;
+  /* 去掉页面默认的外边距 */
 }
 
-/* 侧边栏样式 */
-.sidebar {
-  width: 200px;
-  background-color: #2f3b52;
-  color: white;
-  padding-top: 20px;
+#components-layout-demo-fixed .logo {
+  width: 120px;
+  height: 31px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 16px 24px 16px 0;
+  float: left;
 }
 
-.menu-item {
-  display: block;
-  padding: 10px 20px;
-  color: white;
-  text-decoration: none;
+.site-layout .site-layout-background {
+  background: #fff;
 }
 
-.menu-item:hover {
-  background-color: #4f5b67;
-}
-
-/* 主要内容区域 */
-.main-content {
-  flex: 1;
-  padding: 20px;
-  background-color: #f4f4f4;
+[data-theme='dark'] .site-layout .site-layout-background {
+  background: #141414;
 }
 </style>

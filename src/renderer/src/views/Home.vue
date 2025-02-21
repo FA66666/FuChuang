@@ -1,36 +1,79 @@
 <template>
-    <a-list item-layout="horizontal" :data-source="data">
-        <template #renderItem="{ item }">
-            <a-list-item>
-                <a-list-item-meta
-                    description="Ant Design, a design language for background applications, is refined by Ant UED Team">
-                    <template #title>
-                        <a href="#">{{ item.title }}</a>
-                    </template>
-                    <template #avatar>
-                        <a-avatar src="#" />
-                    </template>
-                </a-list-item-meta>
-            </a-list-item>
-        </template>
-    </a-list>
+    <div>
+        <div style="margin-bottom: 16px">
+            <a-button type="primary" :disabled="!hasSelected" :loading="state.loading" @click="start">
+                Reload
+            </a-button>
+            <span style="margin-left: 8px">
+                <template v-if="hasSelected">
+                    {{ `Selected ${state.selectedRowKeys.length} items` }}
+                </template>
+            </span>
+        </div>
+        <a-table :row-selection="{ selectedRowKeys: state.selectedRowKeys, onChange: onSelectChange }"
+            :columns="columns" :data-source="data" />
+    </div>
 </template>
 <script lang="ts" setup>
-interface DataItem {
-    title: string;
+import { computed, reactive } from 'vue';
+
+type Key = string | number;
+
+interface DataType {
+    key: Key;
+    name: string;
+    age: number;
+    address: string;
 }
-const data: DataItem[] = [
+
+const columns = [
     {
-        title: 'Ant Design Title 1',
+        title: 'Name',
+        dataIndex: 'name',
     },
     {
-        title: 'Ant Design Title 2',
+        title: 'Age',
+        dataIndex: 'age',
     },
     {
-        title: 'Ant Design Title 3',
-    },
-    {
-        title: 'Ant Design Title 4',
+        title: 'Address',
+        dataIndex: 'address',
     },
 ];
+
+const data: DataType[] = [];
+for (let i = 0; i < 46; i++) {
+    data.push({
+        key: i,
+        name: `Edward King ${i}`,
+        age: 32,
+        address: `London, Park Lane no. ${i}`,
+    });
+}
+
+const state = reactive<{
+    selectedRowKeys: Key[];
+    loading: boolean;
+}>({
+    selectedRowKeys: [], // Check here to configure the default column
+    loading: false,
+});
+const hasSelected = computed(() => state.selectedRowKeys.length > 0);
+
+const start = () => {
+    state.loading = true;
+    // ajax request after empty completing
+    setTimeout(() => {
+        state.loading = false;
+        state.selectedRowKeys = [];
+    }, 1000);
+};
+const onSelectChange = (selectedRowKeys: Key[]) => {
+    console.log('selectedRowKeys changed: ', selectedRowKeys);
+    state.selectedRowKeys = selectedRowKeys;
+};
+
+
+
+// 项目来自 https://www.antdv.com/components/table-cn ：选择和操作
 </script>

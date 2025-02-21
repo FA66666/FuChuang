@@ -4,10 +4,10 @@
     <a-layout-header :style="{ position: 'fixed', zIndex: 1, width: '100%' }">
       <div class="logo" />
       <a-menu theme="dark" mode="horizontal" v-model:selectedKeys="selectedKeys" :style="{ lineHeight: '64px' }">
-        <a-menu-item key="1" @click="goHome">首页</a-menu-item>
-        <a-menu-item key="2" @click="goChecking">检测</a-menu-item>
+        <a-menu-item key="1" @click="goHome">我的任务</a-menu-item>
         <a-menu-item key="3" @click="goMyData">我的数据</a-menu-item>
-        <a-menu-item key="4" @click="goReport">报告</a-menu-item>
+        <a-menu-item key="2" @click="goChecking">缺陷检测</a-menu-item>
+        <a-menu-item key="4" @click="goReport">报告生成</a-menu-item>
       </a-menu>
     </a-layout-header>
 

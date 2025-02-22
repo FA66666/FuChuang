@@ -14,3 +14,27 @@ export const useAppStore = defineStore('app', {
     }
   }
 })
+
+export const useTaskStore = defineStore('taskStore', {
+  state: () => ({
+    taskCards: [] as { id: number; content: string }[]
+  }),
+  actions: {
+    addTask(content: string) {
+      const newId = this.taskCards.length + 1
+      this.taskCards.push({
+        id: newId,
+        content
+      })
+    },
+    updateTask(id: number, newContent: string) {
+      const task = this.taskCards.find((task) => task.id === id)
+      if (task) {
+        task.content = newContent
+      }
+    },
+    removeTask(id: number) {
+      this.taskCards = this.taskCards.filter((task) => task.id !== id)
+    }
+  }
+})

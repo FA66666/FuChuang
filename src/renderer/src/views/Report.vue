@@ -6,15 +6,15 @@
             <a-card class="chart-container">
                 <div class="chart-title">基础环图</div>
                 <div class="chart-content">
-                    <!-- 你可以在这里嵌入实际的图表组件 -->
-                    <p>图表内容（可以用chart库如ECharts展示）</p>
+                    <!-- 模拟一个图表 -->
+                    <p>这里是一个环形图区域（可以用 ECharts 等图表库替换）</p>
                 </div>
             </a-card>
 
             <!-- 表格部分 -->
             <a-card class="table-container">
                 <div class="table-title">图片名称</div>
-                <a-table :columns="columns" :data-source="tableData" pagination={false} />
+                <a-table :columns="columns" :data-source="tableData" :pagination="false" />
             </a-card>
         </a-col>
 
@@ -25,81 +25,57 @@
                 <p>报告内容将在此显示...</p>
                 <!-- 选择任务按钮 -->
                 <a-button type="primary" @click="showModal">选择任务</a-button>
-                <p v-if="selectedTask">当前任务为：{{ selectedTask.content }}</p> <!-- 显示当前任务 -->
+                <p v-if="selectedTask">当前任务为：{{ selectedTask.name }}</p> <!-- 显示当前任务名称 -->
             </a-card>
         </a-col>
     </a-row>
 
-    <!-- 选择任务的 Modal -->
+    <!-- 选择任务的 Modal，使用单选框 -->
     <a-modal v-model:visible="isModalVisible" title="选择任务" @ok="handleOk" @cancel="handleCancel">
-        <div class="task-container">
-            <div v-for="task in taskStore.taskCards" :key="task.id" class="task-card">
-                <a-card :title="'任务卡片 ' + task.id" :style="{ width: '100%' }">
-                    <template #extra>
-                        <a href="#" @click="removeTaskCard(task.id)">删除</a>
-                    </template>
-                    <a-checkbox v-model:checked="selectedTasks[task.id]" :value="task.id"
-                        @change="handleCheckboxChange(task)">
-                        {{ task.content }}
-                    </a-checkbox>
-                </a-card>
-            </div>
-        </div>
+        <a-radio-group v-model:value="selectedTaskId">
+            <a-radio v-for="task in taskStore.taskCards" :key="task.id" :value="task.id">
+                {{ task.name }}
+            </a-radio>
+        </a-radio-group>
     </a-modal>
 </template>
 
 <script lang="ts" setup>
 import { ref } from 'vue';
-import { useRouter } from 'vue-router';
 import { useTaskStore } from '../store/index';
-import { Button, Modal, Card, Table, Row, Col, Checkbox } from 'ant-design-vue';
+import { Button, Modal, Card, Table, Row, Col, Radio } from 'ant-design-vue';
 
-const router = useRouter();
 const taskStore = useTaskStore();
 
-// 控制Modal显示和隐藏
+// 控制 Modal 显示和隐藏
 const isModalVisible = ref(false);
 
-// 当前选中的任务
-const selectedTask = ref<{ id: number; content: string } | null>(null);
+// 当前选中的任务（完整任务对象）
+const selectedTask = ref<{ id: number; name: string; content: string } | null>(null);
 
-// 保存所有复选框选择的任务
-const selectedTasks = ref<{ [key: number]: boolean }>({});
+// 用于单选框绑定的任务 ID
+const selectedTaskId = ref<number | null>(null);
 
-// 显示Modal
+// 显示 Modal
 const showModal = () => {
     isModalVisible.value = true;
 };
 
-// 隐藏Modal
+// 取消选择
 const handleCancel = () => {
     isModalVisible.value = false;
+    selectedTaskId.value = null;
 };
 
-// 点击确定按钮时的处理
+// 点击确定按钮时，根据选中的任务 ID 查找任务，并更新 selectedTask
 const handleOk = () => {
-    // 获取被选中的任务
-    const selectedTaskIds = Object.keys(selectedTasks.value)
-        .filter((key) => selectedTasks.value[parseInt(key)]);
-
-    if (selectedTaskIds.length > 0) {
-        const taskId = parseInt(selectedTaskIds[0]); // 只选择一个任务
-        selectedTask.value = taskStore.taskCards.find(task => task.id === taskId) || null;
+    if (selectedTaskId.value !== null) {
+        selectedTask.value = taskStore.taskCards.find(task => task.id === selectedTaskId.value) || null;
     } else {
         selectedTask.value = null;
     }
-
     isModalVisible.value = false;
 };
-
-// 选择任务的处理
-const handleCheckboxChange = (task: { id: number; content: string }) => {
-    console.log('选择了任务:', task);
-};
-
-const removeTaskCard = (id: number) => {
-    taskStore.removeTask(id);
-}
 
 // 表格数据和列
 const columns = [
@@ -133,7 +109,7 @@ const tableData = [
         defect: '类型B',
         confidence: '92%',
     },
-    // 其他数据行
+    // 其他数据行...
 ];
 </script>
 
@@ -169,21 +145,5 @@ const tableData = [
     background-color: #f9f9f9;
     padding: 20px;
     border-radius: 5px;
-}
-
-.task-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-}
-
-.task-card {
-    flex: 0 0 calc(25% - 16px);
-    box-sizing: border-box;
-}
-
-.a-card {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    border-radius: 8px;
 }
 </style>

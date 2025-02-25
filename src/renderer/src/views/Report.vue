@@ -1,7 +1,7 @@
 <template>
     <a-row class="report-container" gutter={20}>
         <!-- 左侧部分 -->
-        <a-col span="16" class="left-panel">
+        <a-col span="14" class="left-panel">
             <!-- 圆环图部分 -->
             <a-card class="chart-container">
                 <div class="chart-title">基础环图</div>
@@ -11,15 +11,11 @@
                 </div>
             </a-card>
 
-            <!-- 表格部分 -->
-            <a-card class="table-container">
-                <div class="table-title">图片名称</div>
-                <a-table :columns="columns" :data-source="tableData" :pagination="false" />
-            </a-card>
+
         </a-col>
 
         <!-- 右侧部分 -->
-        <a-col span="8" class="right-panel">
+        <a-col span="10" class="right-panel">
             <a-card class="report-title">检测报告 (By 大模型)</a-card>
             <a-card class="report-content">
                 <p>报告内容将在此显示...</p>

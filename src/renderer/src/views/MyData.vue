@@ -15,9 +15,10 @@
         <!-- 模态框：列出现有的任务卡片 -->
         <a-modal title="选择任务卡片" v-model:open="isModalVisible" :ok-disabled="!selectedTaskId" @ok="confirmJoin"
             @cancel="cancelJoin">
-            <a-radio-group v-model="selectedTaskId">
+            <!-- 注意这里使用 v-model:value 绑定 selectedTaskId -->
+            <a-radio-group v-model:value="selectedTaskId">
                 <a-radio v-for="task in taskStore.taskCards" :key="task.id" :value="task.id">
-                    任务卡片 {{ task.id }} - {{ task.content || '（空）' }}
+                    {{ task.name }}
                 </a-radio>
             </a-radio-group>
         </a-modal>
@@ -45,7 +46,6 @@ const columns = [
     {
         title: '修改时间',
         dataIndex: 'address',
-        // 自定义格式化日期
         render: (text: string) => {
             const date = new Date(text)
             return `${date.getFullYear()}-${(date.getMonth() + 1)
@@ -106,8 +106,11 @@ const confirmJoin = () => {
         .join('，')
 
     if (selectedTaskId.value !== null) {
-        // 更新选中任务卡片的内容（替换原有内容）
-        taskStore.updateTask(selectedTaskId.value, newContent)
+        // 查找选中任务卡片，获取当前任务名称
+        const task = taskStore.taskCards.find(task => task.id === selectedTaskId.value)
+        const currentName = task ? task.name : ''
+        // 更新选中任务卡片的内容和名称
+        taskStore.updateTask(selectedTaskId.value, newContent, currentName)
     }
 
     // 清空表格选中状态并关闭模态框

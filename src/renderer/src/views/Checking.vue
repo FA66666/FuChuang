@@ -29,6 +29,12 @@
             </a-radio-group>
         </a-modal>
 
+        <!-- 确认传输的模态框 -->
+        <a-modal v-model:visible="isConfirmModalVisible" title="确认传输" @ok="handleConfirm" @cancel="handleCancel">
+            <p><strong>传输内容：</strong></p>
+            <p>{{ transferContent }}</p>
+        </a-modal>
+
         <a-result v-if="detectionResult" status="success" title="检测完成" sub-title="无缺陷"
             extra="{[ <p>{{ detectionResult }}</p>]}" />
     </div>
@@ -49,6 +55,8 @@ const selectedTaskId = ref(null)
 
 const isImportImageModalVisible = ref(false)
 const isImportTaskModalVisible = ref(false)
+const isConfirmModalVisible = ref(false)  // 控制确认模态框的显示
+const transferContent = ref('')  // 存储传输的内容
 
 const columns = [
     {
@@ -120,6 +128,7 @@ const showImportTaskModal = () => {
 const handleCancel = () => {
     isImportImageModalVisible.value = false
     isImportTaskModalVisible.value = false
+    isConfirmModalVisible.value = false
     selectedTaskId.value = null
     imageData.value = null
 }
@@ -128,8 +137,8 @@ const handleCancel = () => {
 const handleImportImage = () => {
     if (imageData.value) {
         console.log('上传图片:', imageData.value)
-        message.success('图片导入成功')
-        isImportImageModalVisible.value = false
+        transferContent.value = `图片名称: ${imageData.value.name}`  // 设置传输内容
+        isConfirmModalVisible.value = true  // 显示确认传输模态框
     } else {
         message.error('请先选择图片')
     }
@@ -142,12 +151,19 @@ const handleImportTask = () => {
         if (task) {
             console.log('导入任务:', task.name)
             console.log('任务中的图片:', task.content)
-            message.success('项目导入成功')
-            isImportTaskModalVisible.value = false
+            transferContent.value = `任务名称: ${task.name}\n任务内容: ${task.content}`  // 设置传输内容
+            isConfirmModalVisible.value = true  // 显示确认传输模态框
         }
     } else {
         message.error('请先选择一个任务')
     }
+}
+
+// 确认传输
+const handleConfirm = () => {
+    console.log('正在传输内容:', transferContent.value)
+    message.success('任务/图片传输成功')
+    handleCancel()  // 关闭所有模态框
 }
 
 // 表格选中行变化

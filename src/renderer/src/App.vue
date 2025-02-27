@@ -4,8 +4,8 @@
       <div class="logo" />
       <a-menu v-model:selectedKeys="selectedKeys" theme="dark" mode="horizontal" :style="{ lineHeight: '64px' }">
         <a-menu-item key="home" @click="goHome">我的任务</a-menu-item>
-        <a-menu-item key="checking" @click="goChecking">缺陷检测</a-menu-item>
         <a-menu-item key="mydata" @click="goMyData">我的数据</a-menu-item>
+        <a-menu-item key="checking" @click="goChecking">缺陷检测</a-menu-item>
         <a-menu-item key="report" @click="goReport">报告生成</a-menu-item>
 
         <a-sub-menu key="user" style="margin-left: auto">

@@ -190,6 +190,10 @@ const deleteUser = (userId: string) => {
     }
 }
 
+const editUser = (user: User): void => {
+    showUserModal(user)
+}
+
 const handlePermissionChange = (user: User, isAdmin: boolean) => {
     Modal.confirm({
         title: '确认修改权限',

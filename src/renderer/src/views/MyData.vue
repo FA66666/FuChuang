@@ -1,7 +1,15 @@
 <template>
     <div>
         <div style="margin-bottom: 16px">
-            <a-button type="primary" :disabled="!hasSelected" @click="openModal">
+            <!-- 添加图片上传按钮 -->
+            <a-upload :before-upload="beforeUpload" :custom-request="handleUpload" :show-upload-list="false"
+                accept="image/*">
+                <a-button type="primary">
+                    <UploadOutlined /> 上传新图片
+                </a-button>
+            </a-upload>
+
+            <a-button type="primary" :disabled="!hasSelected" @click="openModal" style="margin-left: 8px">
                 加入任务
             </a-button>
             <span style="margin-left: 8px">
@@ -10,12 +18,32 @@
                 </template>
             </span>
         </div>
-        <a-table :row-selection="{ selectedRowKeys: state.selectedRowKeys, onChange: onSelectChange }"
-            :columns="columns" :data-source="data" row-key="key" />
-        <!-- 模态框：列出现有的任务卡片 -->
+
+        <a-table :row-selection="{
+            selectedRowKeys: state.selectedRowKeys,
+            onChange: onSelectChange
+        }" :columns="columns" :data-source="data" row-key="key" bordered>
+            <template #bodyCell="{ column, record }">
+                <template v-if="column.dataIndex === 'preview'">
+                    <img :src="record.preview" class="preview-image" @click="handlePreview(record)" />
+                </template>
+                <template v-else-if="column.dataIndex === 'name'">
+                    {{ record.name }}
+                </template>
+                <template v-else-if="column.dataIndex === 'modified'">
+                    {{ formatDate(record.modified) }}
+                </template>
+            </template>
+        </a-table>
+
+        <!-- 图片预览模态框 -->
+        <a-modal :visible="previewVisible" :footer="null" @cancel="previewVisible = false" width="80%">
+            <img class="full-preview" :src="currentPreview" />
+        </a-modal>
+
+        <!-- 任务选择模态框 -->
         <a-modal title="选择任务卡片" v-model:open="isModalVisible" :ok-disabled="!selectedTaskId" @ok="confirmJoin"
             @cancel="cancelJoin">
-            <!-- 注意这里使用 v-model:value 绑定 selectedTaskId -->
             <a-radio-group v-model:value="selectedTaskId">
                 <a-radio v-for="task in taskStore.taskCards" :key="task.id" :value="task.id">
                     {{ task.name }}
@@ -27,101 +55,175 @@
 
 <script lang="ts" setup>
 import { ref, reactive, computed } from 'vue'
-import { useTaskStore } from '../store/index'  // 请根据实际路径调整
+import { message } from 'ant-design-vue'
+import { UploadOutlined } from '@ant-design/icons-vue'
+import { useTaskStore } from '../store/index'
 
-// 定义数据类型
-type Key = string | number
-interface DataType {
-    key: Key
+interface ImageItem {
+    key: string
     name: string
-    address: string
+    preview: string  // base64或图片URL
+    modified: Date
+    file?: File
 }
 
 // 表格列配置
 const columns = [
     {
+        title: '图片预览',
+        dataIndex: 'preview',
+        width: 150
+    },
+    {
         title: '图片名称',
-        dataIndex: 'name'
+        dataIndex: 'name',
+        sorter: (a: ImageItem, b: ImageItem) => a.name.localeCompare(b.name)
     },
     {
         title: '修改时间',
-        dataIndex: 'address',
-        render: (text: string) => {
-            const date = new Date(text)
-            return `${date.getFullYear()}-${(date.getMonth() + 1)
-                .toString()
-                .padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`
-        }
+        dataIndex: 'modified',
+        sorter: (a: ImageItem, b: ImageItem) => a.modified.getTime() - b.modified.getTime()
     }
 ]
 
-// 构造模拟数据（45条）
-const data: DataType[] = []
-for (let i = 1; i < 46; i++) {
-    const date = new Date()
-    date.setDate(date.getDate() - i)
-    data.push({
-        key: i,
-        name: `图片${i}`,
-        address: `${date.getFullYear()}-${(date.getMonth() + 1)
-            .toString()
-            .padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`
-    })
-}
+// 图片数据（初始化示例）
+const data = ref<ImageItem[]>([
+    {
+        key: '1',
+        name: '示例图片1.jpg',
+        preview: 'https://picsum.photos/200/150?random=1',
+        modified: new Date()
+    },
+    {
+        key: '2',
+        name: '示例图片2.png',
+        preview: 'https://picsum.photos/200/150?random=2',
+        modified: new Date(Date.now() - 86400000)
+    }
+])
 
-// 表格选中行的状态
+// 表格选中状态
 const state = reactive<{
-    selectedRowKeys: Key[]
+    selectedRowKeys: string[]
 }>({
     selectedRowKeys: []
 })
 
+// 图片预览相关状态
+const previewVisible = ref(false)
+const currentPreview = ref('')
+
+// 上传处理
+const beforeUpload = (file: File) => {
+    const isImage = file.type.startsWith('image/')
+    const maxSize = 5 * 1024 * 1024 // 5MB
+
+    if (!isImage) {
+        message.error('只能上传图片文件!')
+        return false
+    }
+
+    if (file.size > maxSize) {
+        message.error('图片大小不能超过5MB!')
+        return false
+    }
+
+    return true
+}
+
+const handleUpload = async ({ file }: { file: File }) => {
+    const reader = new FileReader()
+
+    reader.onload = (e) => {
+        const newItem: ImageItem = {
+            key: Date.now().toString(),
+            name: file.name,
+            preview: e.target?.result as string,
+            modified: new Date(),
+            file: file
+        }
+
+        data.value = [newItem, ...data.value]
+        message.success('图片上传成功')
+    }
+
+    reader.readAsDataURL(file)
+}
+
+// 日期格式化
+const formatDate = (date: Date) => {
+    return `${date.getFullYear()}-${(date.getMonth() + 1)
+        .toString()
+        .padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`
+}
+
+// 图片预览处理
+const handlePreview = (record: ImageItem) => {
+    currentPreview.value = record.preview
+    previewVisible.value = true
+}
+
+// 其他原有逻辑保持不变...
 const hasSelected = computed(() => state.selectedRowKeys.length > 0)
-
-// 引入任务卡片的 store
 const taskStore = useTaskStore()
-
-// 控制模态框显示及选中的任务卡片 ID
 const isModalVisible = ref(false)
 const selectedTaskId = ref<number | null>(null)
 
-// 打开模态框
 const openModal = () => {
     isModalVisible.value = true
 }
 
-// 取消加入任务
 const cancelJoin = () => {
     isModalVisible.value = false
     selectedTaskId.value = null
 }
 
-// 确认加入任务：将选中的图片数据格式化后，更新选中的任务卡片内容
 const confirmJoin = () => {
-    // 根据选中的 key，从 data 中筛选出对应的图片数据
-    const selectedData = data.filter(item => state.selectedRowKeys.includes(item.key))
-    // 将每条数据格式化为“图片名称（修改时间）”的形式，并以逗号隔开
+    const selectedData = data.value.filter(item =>
+        state.selectedRowKeys.includes(item.key)
+    )
+
     const newContent = selectedData
-        .map(item => `${item.name} (${item.address})`)
+        .map(item => `${item.name} (${formatDate(item.modified)})`)
         .join('，')
 
     if (selectedTaskId.value !== null) {
-        // 查找选中任务卡片，获取当前任务名称
         const task = taskStore.taskCards.find(task => task.id === selectedTaskId.value)
         const currentName = task ? task.name : ''
-        // 更新选中任务卡片的内容和名称
         taskStore.updateTask(selectedTaskId.value, newContent, currentName)
     }
 
-    // 清空表格选中状态并关闭模态框
     state.selectedRowKeys = []
     selectedTaskId.value = null
     isModalVisible.value = false
 }
 
-// 表格行选择变化
-const onSelectChange = (selectedRowKeys: Key[]) => {
-    console.log('selectedRowKeys changed: ', selectedRowKeys)
+const onSelectChange = (selectedRowKeys: string[]) => {
     state.selectedRowKeys = selectedRowKeys
 }
 </script>
+
+<style scoped>
+.preview-image {
+    width: 120px;
+    height: 90px;
+    object-fit: cover;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: transform 0.2s;
+}
+
+.preview-image:hover {
+    transform: scale(1.05);
+}
+
+.full-preview {
+    width: 100%;
+    max-height: 80vh;
+    object-fit: contain;
+}
+
+.ant-table-cell {
+    vertical-align: middle;
+}
+</style>

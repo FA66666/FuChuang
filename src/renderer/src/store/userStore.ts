@@ -9,7 +9,8 @@ export interface User {
   lastLogin?: string
 }
 
-interface ApiKey {
+export interface ApiKey {
+  // 添加 export
   key: string
   name: string
   createdAt: string

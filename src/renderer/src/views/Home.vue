@@ -9,11 +9,11 @@
         <!-- 显示所有任务卡片 -->
         <div class="card-container">
             <div v-for="task in taskStore.taskCards" :key="task.id" class="task-card">
-                <a-card :title="task.name" :style="{ width: '100%' }">
+                <a-card :title="task.name" class="task-card">
                     <template #extra>
                         <!-- 下拉菜单 -->
                         <a-dropdown>
-                            <a class="ant-dropdown-link" @click.prevent>
+                            <a class="ant-dropdown-link" @click.stop.prevent> <!-- 阻止事件冒泡 -->
                                 更多
                                 <DownOutlined />
                             </a>
@@ -29,124 +29,259 @@
                             </template>
                         </a-dropdown>
                     </template>
-                    <p>{{ task.content }}</p>
+                    <div @click="openTaskDetail(task.id)" class="card-content"> <!-- 添加点击区域 -->
+                        <p>{{ task.content }}</p>
+                        <div class="preview-images">
+                            <img v-for="(img, index) in task.images.slice(0, 3)" :key="index" :src="img"
+                                class="thumbnail" />
+                        </div>
+                    </div>
                 </a-card>
             </div>
         </div>
 
-        <!-- 新建任务的 Modal -->
-        <a-modal v-model:visible="isModalVisible" title="请输入任务名称" @ok="createTask" @cancel="handleCancel">
-            <a-input v-model:value="taskName" placeholder="输入任务名称" @keydown.enter="createTask" />
+        <!-- 任务详情模态框 -->
+        <a-modal v-model:visible="taskDetailVisible" :title="selectedTask?.name" width="80%"
+            @ok="taskDetailVisible = false" :ok-button-props="{ style: { display: 'none' } }">
+            <div class="image-manager">
+                <a-row :gutter="[16, 16]">
+                    <a-col v-for="(image, index) in selectedTask?.images" :key="index" :span="6">
+                        <div class="image-item">
+                            <img :src="image" class="preview-image" />
+                            <a-button type="danger" shape="circle" class="delete-btn" @click="removeImage(index)">
+                                <DeleteOutlined />
+                            </a-button>
+                        </div>
+                    </a-col>
+                </a-row>
+
+                <a-upload :before-upload="beforeUpload" :custom-request="handleUpload" :show-upload-list="false"
+                    accept="image/*">
+                    <a-button type="dashed" block style="margin-top: 16px">
+                        <UploadOutlined /> 添加图片（最大 5MB）
+                    </a-button>
+                </a-upload>
+            </div>
         </a-modal>
 
-        <!-- 重命名任务的 Modal -->
+        <!-- 新建任务 Modal -->
+        <a-modal v-model:visible="isModalVisible" title="请输入任务名称" @ok="createTask" @cancel="handleCancel">
+            <a-input v-model:value="taskName" placeholder="输入任务名称" @keydown.enter="createTask" :maxlength="20"
+                show-count />
+        </a-modal>
+
+        <!-- 重命名 Modal -->
         <a-modal v-model:visible="isRenameModalVisible" title="重命名任务" @ok="renameTask" @cancel="handleRenameCancel">
-            <a-input v-model:value="newTaskName" placeholder="输入新任务名称" />
+            <a-input v-model:value="newTaskName" placeholder="输入新任务名称" :maxlength="20" show-count />
         </a-modal>
     </div>
 </template>
 
 <script lang="ts" setup>
 import { ref } from 'vue'
-import { useTaskStore } from '../store/index'  // 根据实际路径调整
-import { Modal, Input, Button } from 'ant-design-vue'
-import { DownOutlined } from '@ant-design/icons-vue'
+import { message, Modal } from 'ant-design-vue'
+import { DownOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons-vue'
+import { useTaskStore } from '../store/index'
+import type { Task } from '../store/index'
 
 const taskStore = useTaskStore()
 
-// 控制 Modal 显示与隐藏
+// 状态管理
 const isModalVisible = ref(false)
 const isRenameModalVisible = ref(false)
 const taskName = ref('')
-const newTaskName = ref('')  // 用于重命名任务时存储新名称
-const currentTaskId = ref<number | null>(null)  // 当前正在编辑的任务 ID
+const newTaskName = ref('')
+const currentTaskId = ref<number | null>(null)
+const taskDetailVisible = ref(false)
+const selectedTask = ref<Task | null>(null)
 
-// 显示新建任务 Modal
+// 图片上传配置
+const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+
+// 任务卡片点击处理
+const openTaskDetail = (taskId: number) => {
+    selectedTask.value = taskStore.taskCards.find(t => t.id === taskId) || null
+    taskDetailVisible.value = true
+}
+
+// 删除图片
+const removeImage = async (index: number) => {
+    if (!selectedTask.value) return
+
+    Modal.confirm({
+        title: '确认删除图片？',
+        content: '此操作不可恢复',
+        onOk: () => {
+            taskStore.removeTaskImage(selectedTask.value!.id, index)
+            message.success('图片删除成功')
+        }
+    })
+}
+
+// 图片上传处理
+const beforeUpload = (file: File) => {
+    const isImage = file.type.startsWith('image/')
+    const isValidSize = file.size <= MAX_FILE_SIZE
+
+    if (!isImage) {
+        message.error('只能上传图片文件！')
+        return false
+    }
+
+    if (!isValidSize) {
+        message.error('图片大小不能超过5MB！')
+        return false
+    }
+
+    return true
+}
+
+const handleUpload = async ({ file }: { file: File }) => {
+    try {
+        if (!selectedTask.value) return
+
+        // 读取文件为Data URL
+        const dataUrl = await window.electronAPI.readImage(file)
+
+        // 直接存储Data URL
+        taskStore.addTaskImage(selectedTask.value.id, dataUrl)
+        message.success('图片上传成功')
+    } catch (error) {
+        message.error('图片上传失败')
+        console.error('Upload error:', error)
+    }
+}
+
+// 任务管理功能
 const showModal = () => {
     isModalVisible.value = true
+    taskName.value = ''
 }
 
-// 取消新建任务 Modal 显示
 const handleCancel = () => {
     isModalVisible.value = false
-    taskName.value = '' // 清空任务名称
+    taskName.value = ''
 }
 
-// 创建任务卡片
 const createTask = () => {
-    const taskNameToUse = taskName.value.trim() === '' ? `任务${taskStore.taskCards.length + 1}` : taskName.value;
-
-    taskStore.addTask(taskNameToUse, '')  // 使用用户输入的名称或默认名称
+    const name = taskName.value.trim() || `任务${taskStore.taskCards.length + 1}`
+    taskStore.addTask(name, '')
     isModalVisible.value = false
-    taskName.value = ''  // 清空输入框
+    taskName.value = ''
+    message.success('任务创建成功')
 }
 
-// 显示重命名任务的 Modal
 const showRenameModal = (id: number) => {
     currentTaskId.value = id
     const task = taskStore.taskCards.find(task => task.id === id)
-    if (task) {
-        newTaskName.value = task.name
-    }
+    newTaskName.value = task?.name || ''
     isRenameModalVisible.value = true
 }
 
-// 重命名任务
 const renameTask = () => {
-    if (newTaskName.value.trim() === '') {
-        Modal.error({
-            title: '任务名称不能为空'
-        })
-    } else if (currentTaskId.value !== null) {
-        taskStore.updateTask(currentTaskId.value, '', newTaskName.value)  // 更新任务名称
+    if (!newTaskName.value.trim()) {
+        message.error('任务名称不能为空')
+        return
+    }
+
+    if (currentTaskId.value !== null) {
+        taskStore.updateTask(currentTaskId.value, '', newTaskName.value)
         isRenameModalVisible.value = false
-        newTaskName.value = ''  // 清空输入框
+        message.success('任务重命名成功')
     }
 }
 
-// 取消重命名 Modal 显示
 const handleRenameCancel = () => {
     isRenameModalVisible.value = false
     newTaskName.value = ''
 }
 
-// 删除任务卡片
 const removeTaskCard = (id: number) => {
     Modal.confirm({
-        title: '确定删除该任务?',
-        onOk() {
+        title: '确定删除该任务？',
+        content: '所有关联数据将被永久删除',
+        onOk: () => {
             taskStore.removeTask(id)
-        },
+            message.success('任务删除成功')
+        }
     })
 }
 
-// 处理下拉菜单点击事件
 const handleMenuClick = (id: number, command: string) => {
     if (command === 'rename') {
-        showRenameModal(id)  // 显示重命名任务的 Modal
+        showRenameModal(id)
     } else if (command === 'delete') {
-        removeTaskCard(id)  // 删除任务
+        removeTaskCard(id)
     }
 }
 </script>
 
 <style scoped>
-/* 任务卡片容器 */
 .card-container {
     display: flex;
     flex-wrap: wrap;
     gap: 16px;
 }
 
-/* 单个任务卡片 */
 .task-card {
     flex: 0 0 calc(25% - 16px);
     box-sizing: border-box;
+    cursor: pointer;
+    transition: transform 0.2s;
 }
 
-/* 卡片样式 */
-.a-card {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+.task-card:hover {
+    transform: translateY(-2px);
+}
+
+.card-content {
+    padding: 12px;
+}
+
+.preview-images {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.thumbnail {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+.image-manager {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.preview-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
     border-radius: 8px;
+    border: 1px solid #ddd;
+}
+
+.image-item {
+    position: relative;
+    transition: transform 0.2s;
+}
+
+.image-item:hover {
+    transform: scale(0.98);
+}
+
+.delete-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    opacity: 0.7;
+}
+
+.delete-btn:hover {
+    opacity: 1;
 }
 </style>

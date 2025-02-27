@@ -1,47 +1,70 @@
 <template>
   <a-layout>
-    <!-- Header with top navigation -->
     <a-layout-header :style="{ position: 'fixed', zIndex: 1, width: '100%' }">
       <div class="logo" />
       <a-menu theme="dark" mode="horizontal" v-model:selectedKeys="selectedKeys" :style="{ lineHeight: '64px' }">
-        <a-menu-item key="1" @click="goHome">我的任务</a-menu-item>
-        <a-menu-item key="3" @click="goMyData">我的数据</a-menu-item>
-        <a-menu-item key="2" @click="goChecking">缺陷检测</a-menu-item>
-        <a-menu-item key="4" @click="goReport">报告生成</a-menu-item>
+        <!-- 左侧菜单项 -->
+        <a-menu-item key="home" @click="goHome">我的任务</a-menu-item>
+        <a-menu-item key="mydata" @click="goMyData">我的数据</a-menu-item>
+        <a-menu-item key="checking" @click="goChecking">缺陷检测</a-menu-item>
+        <a-menu-item key="report" @click="goReport">报告生成</a-menu-item>
+
+        <!-- 右侧用户状态菜单 -->
+        <a-menu-item v-if="userStore.isLoggedIn" key="logout" style="margin-left: auto" @click="handleLogout">
+          退出登录
+        </a-menu-item>
+        <a-menu-item v-else key="login" style="margin-left: auto" @click="goLogin">
+          登录/注册
+        </a-menu-item>
       </a-menu>
     </a-layout-header>
 
     <a-layout>
       <a-layout-content :style="{ padding: '0 50px', marginTop: '80px', minHeight: 'calc(100vh - 64px)' }">
-
-        <!-- Router view to display content based on the current route -->
         <router-view class="main-content"></router-view>
       </a-layout-content>
     </a-layout>
   </a-layout>
 </template>
 
+
 <script lang="ts" setup>
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';  // 引入 vue-router
+import { ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useUserStore } from './store/userStore'
 
-const router = useRouter();  // 使用 useRouter 获取路由实例
-const selectedKeys = ref<string[]>(['1']);  // 默认选中 "首页"
+const router = useRouter()
+const route = useRoute()
+const userStore = useUserStore()
 
-// 路由跳转方法
-const goHome = () => {
-  router.push('/');  // 跳转到首页
-};
-const goChecking = () => {
-  router.push('/checking');  // 跳转到检测
-};
-const goMyData = () => {
-  router.push('/mydata');  // 跳转到我的数据
-};
-const goReport = () => {
-  router.push('/report');  // 跳转到报告
-};
+const selectedKeys = ref<string[]>([])
 
+
+// 路由变化时更新菜单选中状态
+// 路由监听
+watch(() => route.path, (path) => {
+  switch (path) {
+    case '/': selectedKeys.value = ['home']; break
+    case '/checking': selectedKeys.value = ['checking']; break
+    case '/mydata': selectedKeys.value = ['mydata']; break
+    case '/report': selectedKeys.value = ['report']; break
+    default: selectedKeys.value = []
+  }
+}, { immediate: true })
+
+
+// 导航方法
+const goHome = () => router.push('/')
+const goChecking = () => router.push('/checking')
+const goMyData = () => router.push('/mydata')
+const goReport = () => router.push('/report')
+const goLogin = () => router.push('/login')
+
+// 退出登录
+const handleLogout = () => {
+  userStore.logout()
+  router.replace('/login')
+}
 
 </script>
 

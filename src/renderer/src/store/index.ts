@@ -1,5 +1,17 @@
 import { defineStore } from 'pinia'
 
+export interface Task {
+  id: number
+  name: string
+  content: string
+  images: string[] // 新增图片数组字段
+}
+export interface TaskImage {
+  id: string
+  name: string
+  preview: string // base64或图片路径
+  modified: Date
+}
 export const useAppStore = defineStore('app', {
   state: () => ({
     imageData: null as File | null, // 允许 imageData 为 File 类型或者 null
@@ -17,7 +29,7 @@ export const useAppStore = defineStore('app', {
 
 export const useTaskStore = defineStore('taskStore', {
   state: () => ({
-    taskCards: [] as { id: number; name: string; content: string }[] // 新增 name 属性
+    taskCards: [] as { id: number; name: string; content: string; images: string[] }[] // 新增 name 属性
   }),
   actions: {
     addTask(name: string, content: string) {
@@ -26,7 +38,8 @@ export const useTaskStore = defineStore('taskStore', {
       this.taskCards.push({
         id: newId,
         name, // 任务名称
-        content
+        content,
+        images: []
       })
     },
     updateTask(id: number, newContent: string, newName: string) {
@@ -38,7 +51,24 @@ export const useTaskStore = defineStore('taskStore', {
       }
     },
     removeTask(id: number) {
-      this.taskCards = this.taskCards.filter((task) => task.id !== id)
+      const index = this.taskCards.findIndex((t) => t.id === id)
+      if (index > -1) {
+        // 释放内存
+        this.taskCards[index].images = []
+        this.taskCards.splice(index, 1)
+      }
+    },
+    addTaskImage(id: number, dataUrl: string) {
+      const task = this.taskCards.find((t) => t.id === id)
+      if (task) {
+        task.images.push(dataUrl)
+      }
+    },
+    removeTaskImage(id: number, imageIndex: number) {
+      const task = this.taskCards.find((t) => t.id === id)
+      if (task) {
+        task.images.splice(imageIndex, 1)
+      }
     }
   }
 })

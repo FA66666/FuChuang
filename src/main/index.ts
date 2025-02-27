@@ -1,7 +1,14 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import path from 'path'
+import fs from 'fs'
+
+interface SaveImageParams {
+  name: string
+  data: Uint8Array
+}
 
 function createWindow(): void {
   // Create the browser window.
@@ -49,10 +56,31 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  createWindow()
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
 
-  createWindow()
+  ipcMain.handle('save-image', async (_, params: SaveImageParams) => {
+    const { filePath } = await dialog.showSaveDialog({
+      title: '保存图片',
+      defaultPath: path.join(app.getPath('pictures'), params.name),
+      filters: [
+        { name: 'PNG 图片', extensions: ['png'] },
+        { name: 'JPEG 图片', extensions: ['jpg', 'jpeg'] }
+      ]
+    })
+
+    if (!filePath) {
+      throw new Error('用户取消保存')
+    }
+
+    try {
+      await fs.promises.writeFile(filePath, Buffer.from(params.data))
+      return filePath
+    } catch (error) {
+      throw new Error(`保存失败: ${error.message}`)
+    }
+  })
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the

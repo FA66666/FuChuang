@@ -1,53 +1,63 @@
 import { createRouter, createWebHistory } from 'vue-router'
-
-// 引入你的组件
 import Home from '@renderer/views/Home.vue'
 import Checking from '@renderer/views/Checking.vue'
 import MyData from '@renderer/views/MyData.vue'
 import Report from '@renderer/views/Report.vue'
-// import SelectTask from '@renderer/views/Report/SelectTask.vue' // 假设你的组件路径
-// import VisualAnalysis from '@renderer/views/Report/VisualAnalysis.vue' // 假设你的组件路径
-// import AiAnalysis from '@renderer/views/Report/AiAnalysis.vue' // 假设你的组件路径
+import Login from '@renderer/views/Login.vue'
+import UserCenter from '@renderer/views/UserCenter.vue'
+import { useUserStore } from '../store/userStore'
 
-export default createRouter({
+const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
       path: '/',
       name: 'Home',
-      component: Home
+      component: Home,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/login',
+      name: 'Login',
+      component: Login
+    },
+    {
+      path: '/user',
+      name: 'UserCenter',
+      component: UserCenter,
+      meta: { requiresAuth: true }
     },
     {
       path: '/checking',
       name: 'Checking',
-      component: Checking
+      component: Checking,
+      meta: { requiresAuth: true }
     },
     {
       path: '/mydata',
       name: 'MyData',
-      component: MyData
+      component: MyData,
+      meta: { requiresAuth: true }
     },
     {
       path: '/report',
       name: 'Report',
-      component: Report
-      // children: [
-      //   {
-      //     path: 'select-task', // 对应选择任务的页面
-      //     name: 'SelectTask',
-      //     component: SelectTask
-      //   },
-      //   {
-      //     path: 'visual-analysis', // 对应可视化分析的页面
-      //     name: 'VisualAnalysis',
-      //     component: VisualAnalysis
-      //   },
-      //   {
-      //     path: 'ai-analysis', // 对应AI分析的页面
-      //     name: 'AiAnalysis',
-      //     component: AiAnalysis
-      //   }
-      // ]
+      component: Report,
+      meta: { requiresAuth: true }
     }
   ]
 })
+
+router.beforeEach(async (to) => {
+  const userStore = useUserStore()
+  await userStore.initialize()
+
+  if (to.meta.requiresAuth && !userStore.isLoggedIn) {
+    return {
+      path: '/login',
+      query: { redirect: to.fullPath }
+    }
+  }
+})
+
+export default router

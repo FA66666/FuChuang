@@ -31,23 +31,6 @@ export default createRouter({
       path: '/report',
       name: 'Report',
       component: Report
-      // children: [
-      //   {
-      //     path: 'select-task', // 对应选择任务的页面
-      //     name: 'SelectTask',
-      //     component: SelectTask
-      //   },
-      //   {
-      //     path: 'visual-analysis', // 对应可视化分析的页面
-      //     name: 'VisualAnalysis',
-      //     component: VisualAnalysis
-      //   },
-      //   {
-      //     path: 'ai-analysis', // 对应AI分析的页面
-      //     name: 'AiAnalysis',
-      //     component: AiAnalysis
-      //   }
-      // ]
     }
   ]
 })

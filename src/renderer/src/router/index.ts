@@ -4,6 +4,7 @@ import Checking from '@renderer/views/Checking.vue'
 import MyData from '@renderer/views/MyData.vue'
 import Report from '@renderer/views/Report.vue'
 import Login from '@renderer/views/Login.vue'
+import UserCenter from '@renderer/views/UserCenter.vue'
 import { useUserStore } from '../store/userStore'
 
 const router = createRouter({
@@ -13,6 +14,17 @@ const router = createRouter({
       path: '/',
       name: 'Home',
       component: Home,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/login',
+      name: 'Login',
+      component: Login
+    },
+    {
+      path: '/user',
+      name: 'UserCenter',
+      component: UserCenter,
       meta: { requiresAuth: true }
     },
     {
@@ -32,16 +44,11 @@ const router = createRouter({
       name: 'Report',
       component: Report,
       meta: { requiresAuth: true }
-    },
-    {
-      path: '/login',
-      name: 'Login',
-      component: Login
     }
   ]
 })
 
-router.beforeEach(async (to, from) => {
+router.beforeEach(async (to) => {
   const userStore = useUserStore()
   await userStore.initialize()
 

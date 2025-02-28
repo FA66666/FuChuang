@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia'
-
+const MAX_IMAGES_PER_TASK = 50 // 限制每个任务最大图片数
 export interface Task {
   id: number
   name: string
   content: string
-  images: string[] // 新增图片数组字段
+  images: TaskImage[] // 改为对象数组存储完整图片信息
 }
+
 export interface TaskImage {
   id: string
   name: string
@@ -29,7 +30,7 @@ export const useAppStore = defineStore('app', {
 
 export const useTaskStore = defineStore('taskStore', {
   state: () => ({
-    taskCards: [] as { id: number; name: string; content: string; images: string[] }[] // 新增 name 属性
+    taskCards: [] as Task[]
   }),
   actions: {
     addTask(name: string, content: string) {
@@ -58,10 +59,13 @@ export const useTaskStore = defineStore('taskStore', {
         this.taskCards.splice(index, 1)
       }
     },
-    addTaskImage(id: number, dataUrl: string) {
+    addTaskImage(id: number, image: TaskImage) {
       const task = this.taskCards.find((t) => t.id === id)
       if (task) {
-        task.images.push(dataUrl)
+        if (task.images.length >= MAX_IMAGES_PER_TASK) {
+          throw new Error('单个任务最多添加50张图片')
+        }
+        task.images.push(image)
       }
     },
     removeTaskImage(id: number, imageIndex: number) {
@@ -69,6 +73,17 @@ export const useTaskStore = defineStore('taskStore', {
       if (task) {
         task.images.splice(imageIndex, 1)
       }
-    }
+    },
+    persistTasks() {
+      localStorage.setItem('tasks', JSON.stringify(this.taskCards))
+    },
+    // 添加自动保存
+    plugins: [
+      (store) => {
+        store.$subscribe(() => {
+          store.persistTasks()
+        })
+      }
+    ]
   }
 })

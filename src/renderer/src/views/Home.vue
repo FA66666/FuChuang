@@ -32,8 +32,12 @@
                     <div @click="openTaskDetail(task.id)" class="card-content"> <!-- 添加点击区域 -->
                         <p>{{ task.content }}</p>
                         <div class="preview-images">
-                            <img v-for="(img, index) in task.images.slice(0, 3)" :key="index" :src="img"
-                                class="thumbnail" />
+                            <a-tooltip v-for="(img, index) in task.images" :key="img.id" :title="img.name">
+                                <img :src="img.preview" class="thumbnail" />
+                                <span v-if="index === 2 && task.images.length > 3" class="more-count">
+                                    +{{ task.images.length - 3 }}
+                                </span>
+                            </a-tooltip>
                         </div>
                     </div>
                 </a-card>
@@ -283,5 +287,22 @@ const handleMenuClick = (id: number, command: string) => {
 
 .delete-btn:hover {
     opacity: 1;
+}
+
+.thumbnail {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-right: 8px;
+    border: 1px solid #f0f0f0;
+}
+
+.more-count {
+    background: rgba(0, 0, 0, 0.65);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
 }
 </style>

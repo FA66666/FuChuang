@@ -183,14 +183,20 @@ const confirmJoin = () => {
         state.selectedRowKeys.includes(item.key)
     )
 
-    const newContent = selectedData
-        .map(item => `${item.name} (${formatDate(item.modified)})`)
-        .join('，')
-
     if (selectedTaskId.value !== null) {
         const task = taskStore.taskCards.find(task => task.id === selectedTaskId.value)
-        const currentName = task ? task.name : ''
-        taskStore.updateTask(selectedTaskId.value, newContent, currentName)
+        if (task) {
+            // 将选中的图片对象添加到任务
+            selectedData.forEach(img => {
+                task.images.push({
+                    id: img.key,
+                    name: img.name,
+                    preview: img.preview,
+                    modified: img.modified
+                })
+            })
+            message.success(`成功添加 ${selectedData.length} 张图片`)
+        }
     }
 
     state.selectedRowKeys = []

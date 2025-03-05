@@ -10,58 +10,60 @@ export interface User {
 }
 
 export interface ApiKey {
-  // 添加 export
   key: string
   name: string
   createdAt: string
 }
 
+interface UserState {
+  currentUser: User | null
+  users: User[]
+  apiKeys: ApiKey[]
+  initialized: boolean
+}
+
 export const useUserStore = defineStore('user', {
-  state: () => ({
-    currentUser: null as User | null,
-    users: [] as User[],
-    apiKeys: [] as ApiKey[],
+  state: (): UserState => ({
+    currentUser: null,
+    users: [],
+    apiKeys: [],
     initialized: false
   }),
 
   getters: {
     isLoggedIn: (state) => !!state.currentUser,
-    isAdmin: (state) => state.currentUser?.isAdmin || false
+    isAdmin: (state) => state.currentUser?.isAdmin ?? false,
+    getUserById: (state) => (userId: string) => state.users.find((u) => u.id === userId)
   },
 
   actions: {
     initialize() {
       if (this.initialized) return
 
-      // Load users
-      const savedUsers = localStorage.getItem('users')
-      this.users = savedUsers ? JSON.parse(savedUsers) : []
-
-      // Load current user
-      const savedUser = localStorage.getItem('currentUser')
-      this.currentUser = savedUser ? JSON.parse(savedUser) : null
-
-      // Load API keys
-      const savedKeys = localStorage.getItem('apiKeys')
-      this.apiKeys = savedKeys ? JSON.parse(savedKeys) : []
-
-      this.initialized = true
+      try {
+        this.users = JSON.parse(localStorage.getItem('users') || '[]')
+        this.currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null')
+        this.apiKeys = JSON.parse(localStorage.getItem('apiKeys') || '[]')
+      } catch (error) {
+        console.error('初始化用户存储失败:', error)
+        this.clearStorage()
+      } finally {
+        this.initialized = true
+      }
     },
 
-    register(
-      username: string,
-      password: string,
-      isAdmin: boolean = false // 添加管理员参数
-    ) {
-      if (this.users.some((u) => u.username === username)) {
-        throw new Error('用户名已存在')
+    register(username: string, password: string, isAdmin: boolean = false) {
+      this.initializeIfNeeded()
+
+      if (this.users.some((u) => u.username.toLowerCase() === username.toLowerCase())) {
+        throw new Error(`用户 ${username} 已存在`)
       }
 
       const newUser: User = {
-        id: Date.now().toString(),
+        id: crypto.randomUUID(),
         username,
         password,
-        isAdmin, // 设置管理员状态
+        isAdmin,
         createTime: new Date().toISOString()
       }
 
@@ -70,7 +72,7 @@ export const useUserStore = defineStore('user', {
     },
 
     login(username: string, password: string) {
-      this.initialize()
+      this.initializeIfNeeded()
 
       const user = this.users.find((u) => u.username === username && u.password === password)
 
@@ -90,32 +92,33 @@ export const useUserStore = defineStore('user', {
 
     updateUser(updatedUser: User) {
       const index = this.users.findIndex((u) => u.id === updatedUser.id)
-      if (index >= 0) {
-        this.users[index] = updatedUser
-        this.persistUsers()
+      if (index === -1) return
 
-        // Update current user if editing self
-        if (this.currentUser?.id === updatedUser.id) {
-          this.currentUser = updatedUser
-          this.persistCurrentUser()
-        }
+      this.users.splice(index, 1, updatedUser)
+      this.persistUsers()
+
+      if (this.currentUser?.id === updatedUser.id) {
+        this.currentUser = updatedUser
+        this.persistCurrentUser()
       }
     },
 
     deleteUser(userId: string) {
       this.users = this.users.filter((u) => u.id !== userId)
+      if (this.currentUser?.id === userId) this.logout()
       this.persistUsers()
     },
 
-    generateApiKey(name: string) {
-      const newKey = {
-        key: `sk-${Math.random().toString(36).substr(2, 24)}`,
+    generateApiKey(name: string): ApiKey {
+      const newKey: ApiKey = {
+        key: `sk-${crypto.randomUUID().replace(/-/g, '')}`,
         name,
         createdAt: new Date().toISOString()
       }
 
       this.apiKeys.push(newKey)
       this.persistApiKeys()
+      return newKey
     },
 
     revokeApiKey(key: string) {
@@ -123,7 +126,11 @@ export const useUserStore = defineStore('user', {
       this.persistApiKeys()
     },
 
-    // Helper methods
+    // 私有方法
+    initializeIfNeeded() {
+      if (!this.initialized) this.initialize()
+    },
+
     persistUsers() {
       localStorage.setItem('users', JSON.stringify(this.users))
     },
@@ -134,6 +141,13 @@ export const useUserStore = defineStore('user', {
 
     persistApiKeys() {
       localStorage.setItem('apiKeys', JSON.stringify(this.apiKeys))
+    },
+
+    clearStorage() {
+      localStorage.removeItem('users')
+      localStorage.removeItem('currentUser')
+      localStorage.removeItem('apiKeys')
+      this.$reset()
     }
   }
 })

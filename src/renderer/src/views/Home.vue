@@ -8,7 +8,7 @@
 
         <!-- 显示所有任务卡片 -->
         <div class="card-container">
-            <div v-for="task in taskStore.taskCards" :key="task.id" class="task-card">
+            <div v-for="task in tasks" :key="task.id" class="task-card">
                 <a-card :title="task.name" class="task-card">
                     <template #extra>
                         <!-- 下拉菜单 -->
@@ -51,7 +51,7 @@
                 <a-row :gutter="[16, 16]">
                     <a-col v-for="(image, index) in selectedTask?.images" :key="index" :span="6">
                         <div class="image-item">
-                            <img :src="image" class="preview-image" />
+                            <img :src="image.preview" class="preview-image" />
                             <a-button type="danger" shape="circle" class="delete-btn" @click="removeImage(index)">
                                 <DeleteOutlined />
                             </a-button>
@@ -82,227 +82,186 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue'
-import { message, Modal } from 'ant-design-vue'
-import { DownOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons-vue'
-import { useTaskStore } from '../store/index'
-import type { Task } from '../store/index'
+import { ref, onMounted } from 'vue';
+import { message, Modal } from 'ant-design-vue';
+import { DownOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons-vue';
+import { useTaskStore } from '../store/index';
+import api from '../utils/api'; // 假设你已经有 axios 实例
+import type { Task } from '../store/index';
 
-const taskStore = useTaskStore()
+const taskStore = useTaskStore();
+
+const tasks = ref<Task[]>([]); // 存储任务列表
 
 // 状态管理
-const isModalVisible = ref(false)
-const isRenameModalVisible = ref(false)
-const taskName = ref('')
-const newTaskName = ref('')
-const currentTaskId = ref<number | null>(null)
-const taskDetailVisible = ref(false)
-const selectedTask = ref<Task | null>(null)
+const isModalVisible = ref(false);
+const isRenameModalVisible = ref(false);
+const taskName = ref('');
+const newTaskName = ref('');
+const currentTaskId = ref<number | null>(null);
+const taskDetailVisible = ref(false);
+const selectedTask = ref<Task | null>(null);
 
 // 图片上传配置
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
+// 获取任务列表
+const getTasks = async () => {
+    try {
+        const response = await api.get('/tasks');
+        tasks.value = response.data.data.tasks;
+    } catch (error) {
+        message.error('获取任务列表失败');
+        console.error('Error fetching tasks:', error);
+    }
+};
 
 // 任务卡片点击处理
 const openTaskDetail = (taskId: number) => {
-    selectedTask.value = taskStore.taskCards.find(t => t.id === taskId) || null
-    taskDetailVisible.value = true
-}
+    selectedTask.value = taskStore.taskCards.find(t => t.id === taskId) || null;
+    taskDetailVisible.value = true;
+};
 
 // 删除图片
 const removeImage = async (index: number) => {
-    if (!selectedTask.value) return
+    if (!selectedTask.value) return;
 
     Modal.confirm({
         title: '确认删除图片？',
         content: '此操作不可恢复',
         onOk: () => {
-            taskStore.removeTaskImage(selectedTask.value!.id, index)
-            message.success('图片删除成功')
-        }
-    })
-}
+            taskStore.removeTaskImage(selectedTask.value!.id, index);
+            message.success('图片删除成功');
+        },
+    });
+};
 
 // 图片上传处理
 const beforeUpload = (file: File) => {
-    const isImage = file.type.startsWith('image/')
-    const isValidSize = file.size <= MAX_FILE_SIZE
+    const isImage = file.type.startsWith('image/');
+    const isValidSize = file.size <= MAX_FILE_SIZE;
 
     if (!isImage) {
-        message.error('只能上传图片文件！')
-        return false
+        message.error('只能上传图片文件！');
+        return false;
     }
 
     if (!isValidSize) {
-        message.error('图片大小不能超过5MB！')
-        return false
+        message.error('图片大小不能超过5MB！');
+        return false;
     }
 
-    return true
-}
+    return true;
+};
 
 const handleUpload = async ({ file }: { file: File }) => {
     try {
-        if (!selectedTask.value) return
+        if (!selectedTask.value) return;
 
         // 读取文件为Data URL
-        const dataUrl = await window.electronAPI.readImage(file)
+        const dataUrl = await window.electronAPI.readImage(file);
 
         // 直接存储Data URL
-        taskStore.addTaskImage(selectedTask.value.id, dataUrl)
-        message.success('图片上传成功')
+        taskStore.addTaskImage(selectedTask.value.id, dataUrl);
+        message.success('图片上传成功');
     } catch (error) {
-        message.error('图片上传失败')
-        console.error('Upload error:', error)
+        message.error('图片上传失败');
+        console.error('Upload error:', error);
     }
-}
+};
 
 // 任务管理功能
 const showModal = () => {
-    isModalVisible.value = true
-    taskName.value = ''
-}
+    isModalVisible.value = true;
+    taskName.value = '';
+};
 
 const handleCancel = () => {
-    isModalVisible.value = false
-    taskName.value = ''
-}
+    isModalVisible.value = false;
+    taskName.value = '';
+};
 
-const createTask = () => {
-    const name = taskName.value.trim() || `任务${taskStore.taskCards.length + 1}`
-    taskStore.addTask(name, '')
-    isModalVisible.value = false
-    taskName.value = ''
-    message.success('任务创建成功')
-}
+// 创建任务
+const createTask = async () => {
+    const name = taskName.value.trim() || `任务${taskStore.taskCards.length + 1}`;
+    try {
+        const response = await api.post('/tasks', { name });
+        tasks.value.push(response.data.data);
+        isModalVisible.value = false;
+        taskName.value = '';
+        message.success('任务创建成功');
+    } catch (error) {
+        message.error('创建任务失败');
+        console.error('Error creating task:', error);
+    }
+};
 
 const showRenameModal = (id: number) => {
-    currentTaskId.value = id
-    const task = taskStore.taskCards.find(task => task.id === id)
-    newTaskName.value = task?.name || ''
-    isRenameModalVisible.value = true
-}
+    currentTaskId.value = id;
+    const task = tasks.value.find(task => task.id === id);
+    newTaskName.value = task?.name || '';
+    isRenameModalVisible.value = true;
+};
 
-const renameTask = () => {
+// 重命名任务
+const renameTask = async () => {
     if (!newTaskName.value.trim()) {
-        message.error('任务名称不能为空')
-        return
+        message.error('任务名称不能为空');
+        return;
     }
 
     if (currentTaskId.value !== null) {
-        taskStore.updateTask(currentTaskId.value, '', newTaskName.value)
-        isRenameModalVisible.value = false
-        message.success('任务重命名成功')
+        try {
+            const response = await api.patch(`/tasks/${currentTaskId.value}/rename`, {
+                name: newTaskName.value,
+            });
+            const updatedTask = response.data.data;
+            const index = tasks.value.findIndex(task => task.id === currentTaskId.value);
+            if (index !== -1) {
+                tasks.value[index] = updatedTask;
+            }
+            isRenameModalVisible.value = false;
+            message.success('任务重命名成功');
+        } catch (error) {
+            message.error('重命名任务失败');
+            console.error('Error renaming task:', error);
+        }
     }
-}
+};
 
 const handleRenameCancel = () => {
-    isRenameModalVisible.value = false
-    newTaskName.value = ''
-}
+    isRenameModalVisible.value = false;
+    newTaskName.value = '';
+};
 
-const removeTaskCard = (id: number) => {
+// 删除任务
+const removeTaskCard = async (id: number) => {
     Modal.confirm({
         title: '确定删除该任务？',
         content: '所有关联数据将被永久删除',
-        onOk: () => {
-            taskStore.removeTask(id)
-            message.success('任务删除成功')
-        }
-    })
-}
+        onOk: async () => {
+            try {
+                await api.delete(`/tasks/${id}`);
+                tasks.value = tasks.value.filter(task => task.id !== id);
+                message.success('任务删除成功');
+            } catch (error) {
+                message.error('删除任务失败');
+                console.error('Error deleting task:', error);
+            }
+        },
+    });
+};
 
 const handleMenuClick = (id: number, command: string) => {
     if (command === 'rename') {
-        showRenameModal(id)
+        showRenameModal(id);
     } else if (command === 'delete') {
-        removeTaskCard(id)
+        removeTaskCard(id);
     }
-}
+};
+
+// 初始化任务列表
+onMounted(() => {
+    getTasks();
+});
 </script>
-
-<style scoped>
-.card-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-}
-
-.task-card {
-    flex: 0 0 calc(25% - 16px);
-    box-sizing: border-box;
-    cursor: pointer;
-    transition: transform 0.2s;
-}
-
-.task-card:hover {
-    transform: translateY(-2px);
-}
-
-.card-content {
-    padding: 12px;
-}
-
-.preview-images {
-    display: flex;
-    gap: 8px;
-    margin-top: 12px;
-}
-
-.thumbnail {
-    width: 60px;
-    height: 60px;
-    object-fit: cover;
-    border-radius: 4px;
-    border: 1px solid #ddd;
-}
-
-.image-manager {
-    max-height: 60vh;
-    overflow-y: auto;
-}
-
-.preview-image {
-    width: 100%;
-    height: 200px;
-    object-fit: cover;
-    border-radius: 8px;
-    border: 1px solid #ddd;
-}
-
-.image-item {
-    position: relative;
-    transition: transform 0.2s;
-}
-
-.image-item:hover {
-    transform: scale(0.98);
-}
-
-.delete-btn {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    opacity: 0.7;
-}
-
-.delete-btn:hover {
-    opacity: 1;
-}
-
-.thumbnail {
-    width: 60px;
-    height: 60px;
-    object-fit: cover;
-    border-radius: 4px;
-    margin-right: 8px;
-    border: 1px solid #f0f0f0;
-}
-
-.more-count {
-    background: rgba(0, 0, 0, 0.65);
-    color: white;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 12px;
-}
-</style>

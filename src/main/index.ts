@@ -1,6 +1,8 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, safeStorage } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import express from 'express'
+import cors from 'cors'
 import icon from '../../resources/icon.png?asset'
 import path from 'path'
 import fs from 'fs'
@@ -10,93 +12,106 @@ interface SaveImageParams {
   data: Uint8Array
 }
 
-function createWindow(): void {
-  // Create the browser window.
+// ================= 安全存储配置 =================
+const TOKEN_DIR = app.getPath('userData')
+const createSecureStorage = (filename: string) => ({
+  save: (token: string): void => {
+    const encrypted = safeStorage.encryptString(token)
+    fs.writeFileSync(path.join(TOKEN_DIR, filename), encrypted)
+  },
+  load: (): string | null => {
+    try {
+      const encrypted = fs.readFileSync(path.join(TOKEN_DIR, filename))
+      return safeStorage.decryptString(encrypted)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        console.error(`读取 ${filename} 失败:`, error)
+      }
+      return null
+    }
+  },
+  clear: (): void => {
+    const filePath = path.join(TOKEN_DIR, filename)
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+  }
+})
+
+const tokenStore = {
+  accessToken: createSecureStorage('access-token.enc'),
+  refreshToken: createSecureStorage('refresh-token.enc')
+}
+
+// ================= 窗口管理 =================
+function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
     show: false,
     autoHideMenuBar: true,
-    ...(process.platform === 'linux' ? { icon } : {}),
+    icon: process.platform === 'linux' ? icon : undefined,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: false,
+      contextIsolation: true
     }
   })
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
-  })
+  mainWindow.on('ready-to-show', () => mainWindow.show())
 
-  mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
-    return { action: 'deny' }
-  })
-
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
+  // 加载页面逻辑
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    mainWindow.webContents.openDevTools()
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  return mainWindow
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
+// ================= 应用初始化 =================
 app.whenReady().then(() => {
-  // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
+  // 创建主窗口
+  const mainWindow = createWindow()
+
+  // ================= IPC 通信处理 =================
+  // Token 管理
+  ipcMain.handle('token:get', (_, type: 'access' | 'refresh') => tokenStore[type].load())
+  ipcMain.handle('token:set', (_, type: 'access' | 'refresh', token: string) => {
+    tokenStore[type].save(token)
+    return true
+  })
+  ipcMain.handle('token:clear', () => {
+    tokenStore.accessToken.clear()
+    tokenStore.refreshToken.clear()
+  })
+
+  // 文件操作
+  ipcMain.handle('file:save-image', async (_, params: SaveImageParams) => {
+    const { filePath } = await dialog.showSaveDialog(mainWindow, {
+      title: '保存图片',
+      defaultPath: path.join(app.getPath('pictures'), params.name),
+      filters: [{ name: '图片文件', extensions: ['png', 'jpg', 'jpeg'] }]
+    })
+    if (!filePath) throw new Error('用户取消操作')
+    await fs.promises.writeFile(filePath, Buffer.from(params.data))
+    return filePath
+  })
+  // ================== 主进程需要添加的 IPC 处理 ==================
+  // 在 src/main/index.ts 中添加：
+  ipcMain.handle('get-is-packaged', () => app.isPackaged)
+
+  // 窗口管理
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
-
-  createWindow()
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
-
-  ipcMain.handle('save-image', async (_, params: SaveImageParams) => {
-    const { filePath } = await dialog.showSaveDialog({
-      title: '保存图片',
-      defaultPath: path.join(app.getPath('pictures'), params.name),
-      filters: [
-        { name: 'PNG 图片', extensions: ['png'] },
-        { name: 'JPEG 图片', extensions: ['jpg', 'jpeg'] }
-      ]
-    })
-
-    if (!filePath) {
-      throw new Error('用户取消保存')
-    }
-
-    try {
-      await fs.promises.writeFile(filePath, Buffer.from(params.data))
-      return filePath
-    } catch (error) {
-      throw new Error(`保存失败: ${error.message}`)
-    }
-  })
-
-  app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
+  app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
+  if (process.platform !== 'darwin') app.quit()
 })
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.

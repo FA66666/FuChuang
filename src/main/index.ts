@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import axios from 'axios'
 import path from 'path'
 import fs from 'fs'
 
@@ -9,6 +10,11 @@ interface SaveImageParams {
   name: string
   data: Uint8Array
 }
+
+// 定义全局变量用于存储token
+let authToken: string | null = null
+
+const API_BASE_URL = 'http://localhost:3000/api/'
 
 function createWindow(): void {
   // Create the browser window.
@@ -32,9 +38,6 @@ function createWindow(): void {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
-
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -42,16 +45,10 @@ function createWindow(): void {
   }
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
@@ -81,22 +78,60 @@ app.whenReady().then(() => {
       throw new Error(`保存失败: ${error.message}`)
     }
   })
+  // 注册处理器
+  ipcMain.handle('register-user', async (_, { username, password }) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}auth/register`, {
+        username,
+        password
+      })
+
+      return {
+        message: response.data.message
+      }
+    } catch (error) {
+      return {
+        message: error.response?.data?.message || '服务不可用，请稍后重试'
+      }
+    }
+  })
+  // 登录处理器
+  ipcMain.handle('login-user', async (_, credentials) => {
+    const response = await axios.post(`${API_BASE_URL}auth/login`, credentials)
+
+    // 存储token到全局变量中
+    if (response.data.token) {
+      authToken = response.data.token
+    }
+
+    return response.data
+  })
+  // 当前用户获取
+  ipcMain.handle('get-current-user', async () => {
+    try {
+      // 从全局变量中获取token
+      const token = authToken
+
+      const response = await axios.get(`${API_BASE_URL}/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
+
+      return response.data.user || null
+    } catch (error) {
+      console.error('获取用户失败:', error.message)
+      return null
+    }
+  })
 
   app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
 })
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.

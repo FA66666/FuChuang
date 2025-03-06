@@ -5,12 +5,10 @@ export interface User {
   username: string
   password: string
   isAdmin: boolean
-  createTime?: string
   lastLogin?: string
 }
 
 export interface ApiKey {
-  // 添加 export
   key: string
   name: string
   createdAt: string
@@ -33,54 +31,29 @@ export const useUserStore = defineStore('user', {
     initialize() {
       if (this.initialized) return
 
-      // Load users
-      const savedUsers = localStorage.getItem('users')
-      this.users = savedUsers ? JSON.parse(savedUsers) : []
-
-      // Load current user
-      const savedUser = localStorage.getItem('currentUser')
-      this.currentUser = savedUser ? JSON.parse(savedUser) : null
-
-      // Load API keys
-      const savedKeys = localStorage.getItem('apiKeys')
-      this.apiKeys = savedKeys ? JSON.parse(savedKeys) : []
-
-      this.initialized = true
+      // 改为从主进程获取
+      window.electronAPI.getCurrentUser().then((user) => {
+        this.currentUser = user
+        this.initialized = true
+      })
     },
 
-    register(
-      username: string,
-      password: string,
-      isAdmin: boolean = false // 添加管理员参数
-    ) {
-      if (this.users.some((u) => u.username === username)) {
-        throw new Error('用户名已存在')
-      }
+    async register(username: string, password: string) {
+      const result = await window.electronAPI.register({ username, password })
 
-      const newUser: User = {
-        id: Date.now().toString(),
-        username,
-        password,
-        isAdmin, // 设置管理员状态
-        createTime: new Date().toISOString()
-      }
+      // 注册后自动登录
+      const loginResult = await window.electronAPI.login({ username, password })
 
-      this.users.push(newUser)
-      this.persistUsers()
-    },
-
-    login(username: string, password: string) {
-      this.initialize()
-
-      const user = this.users.find((u) => u.username === username && u.password === password)
-
-      if (!user) throw new Error('用户名或密码错误')
-
-      this.currentUser = {
-        ...user,
-        lastLogin: new Date().toISOString()
-      }
+      this.currentUser = loginResult.user
       this.persistCurrentUser()
+    },
+
+    async login(username: string, password: string) {
+      const result = await window.electronAPI.login({ username, password })
+
+      this.currentUser = result.user
+      this.persistCurrentUser()
+      localStorage.setItem('authToken', result.token)
     },
 
     logout() {

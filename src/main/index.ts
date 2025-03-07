@@ -1,3 +1,4 @@
+// src/main/index.ts
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -11,13 +12,13 @@ interface SaveImageParams {
   data: Uint8Array
 }
 
-// 定义全局变量用于存储token
+// 定义全局变量用于存储token（登录时使用）
 let authToken: string | null = null
 
 const API_BASE_URL = 'http://localhost:3000/api/'
 
 function createWindow(): void {
-  // Create the browser window.
+  // 创建浏览器窗口
   const mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -38,6 +39,7 @@ function createWindow(): void {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
+
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -46,7 +48,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(async () => {
-  // Set app user model id for windows
+  // 设置 windows 平台下的 app user model id
   electronApp.setAppUserModelId('com.electron')
 
   app.on('browser-window-created', (_, window) => {
@@ -54,7 +56,7 @@ app.whenReady().then(async () => {
   })
 
   createWindow()
-  // IPC test
+  // IPC 测试
   ipcMain.on('ping', () => console.log('pong'))
 
   ipcMain.handle('save-image', async (_, params: SaveImageParams) => {
@@ -78,6 +80,7 @@ app.whenReady().then(async () => {
       throw new Error(`保存失败: ${error.message}`)
     }
   })
+
   // 注册处理器
   ipcMain.handle('register-user', async (_, { username, password }) => {
     try {
@@ -95,30 +98,27 @@ app.whenReady().then(async () => {
       }
     }
   })
+
   // 登录处理器
   ipcMain.handle('login-user', async (_, credentials) => {
     const response = await axios.post(`${API_BASE_URL}auth/login`, credentials)
 
-    // 存储token到全局变量中
+    // 存储 token 到全局变量中
     if (response.data.token) {
       authToken = response.data.token
     }
 
     return response.data
   })
-  // 当前用户获取
-  ipcMain.handle('get-current-user', async () => {
+
+  // 修改后的当前用户获取处理器：从渲染进程的 localStorage 获取当前用户数据
+  ipcMain.handle('get-current-user', async (event) => {
     try {
-      // 从全局变量中获取token
-      const token = authToken
-
-      const response = await axios.get(`${API_BASE_URL}/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      })
-
-      return response.data.user || null
+      // 在渲染进程中执行 localStorage.getItem('currentUser')
+      const currentUserStr = await event.sender.executeJavaScript(
+        "localStorage.getItem('currentUser')"
+      )
+      return currentUserStr ? JSON.parse(currentUserStr) : null
     } catch (error) {
       console.error('获取用户失败:', error.message)
       return null

@@ -54,20 +54,21 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { UploadOutlined } from '@ant-design/icons-vue'
 import { useTaskStore } from '../store/index'
+import request from '../utils/request'
 
 interface ImageItem {
     key: string
     name: string
-    preview: string  // base64或图片URL
+    preview: string
     modified: Date
     file?: File
+    id: number
 }
 
-// 表格列配置
 const columns = [
     {
         title: '图片预览',
@@ -86,34 +87,17 @@ const columns = [
     }
 ]
 
-// 图片数据（初始化示例）
-const data = ref<ImageItem[]>([
-    {
-        key: '1',
-        name: '示例图片1.jpg',
-        preview: 'https://picsum.photos/200/150?random=1',
-        modified: new Date()
-    },
-    {
-        key: '2',
-        name: '示例图片2.png',
-        preview: 'https://picsum.photos/200/150?random=2',
-        modified: new Date(Date.now() - 86400000)
-    }
-])
+const data = ref<ImageItem[]>([])
 
-// 表格选中状态
 const state = reactive<{
     selectedRowKeys: string[]
 }>({
     selectedRowKeys: []
 })
 
-// 图片预览相关状态
 const previewVisible = ref(false)
 const currentPreview = ref('')
 
-// 上传处理
 const beforeUpload = (file: File) => {
     const isImage = file.type.startsWith('image/')
     const maxSize = 5 * 1024 * 1024 // 5MB
@@ -132,38 +116,48 @@ const beforeUpload = (file: File) => {
 }
 
 const handleUpload = async ({ file }: { file: File }) => {
-    const reader = new FileReader()
+    const formData = new FormData();
+    formData.append('image', file);
+    // 前端提供部分图片信息
+    const imageInfo = {
+        filename: file.name, // 使用上传文件的原始名称
+        status: 'pending'   // 默认状态
+    };
+    formData.append('imageInfo', JSON.stringify(imageInfo));
 
-    reader.onload = (e) => {
+    try {
+        const response = await request.post('http://localhost:3000/api/images/upload', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        const uploadedImage = response.data.image;
         const newItem: ImageItem = {
-            key: Date.now().toString(),
-            name: file.name,
-            preview: e.target?.result as string,
-            modified: new Date(),
-            file: file
-        }
-
-        data.value = [newItem, ...data.value]
-        message.success('图片上传成功')
+            key: uploadedImage.id.toString(),
+            name: uploadedImage.filename,
+            preview: `http://localhost:3000/uploads/processed/${uploadedImage.filename}`,
+            modified: new Date(uploadedImage.upload_time),
+            id: uploadedImage.id
+        };
+        data.value = [newItem, ...data.value];
+        message.success('图片上传成功');
+    } catch (error) {
+        message.error('图片上传失败');
+        console.error(error);
     }
+};
 
-    reader.readAsDataURL(file)
-}
-
-// 日期格式化
 const formatDate = (date: Date) => {
     return `${date.getFullYear()}-${(date.getMonth() + 1)
         .toString()
         .padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`
 }
 
-// 图片预览处理
 const handlePreview = (record: ImageItem) => {
     currentPreview.value = record.preview
     previewVisible.value = true
 }
 
-// 其他原有逻辑保持不变...
 const hasSelected = computed(() => state.selectedRowKeys.length > 0)
 const taskStore = useTaskStore()
 const isModalVisible = ref(false)
@@ -178,24 +172,31 @@ const cancelJoin = () => {
     selectedTaskId.value = null
 }
 
-const confirmJoin = () => {
+const confirmJoin = async () => {
     const selectedData = data.value.filter(item =>
         state.selectedRowKeys.includes(item.key)
     )
+    const imageIds = selectedData.map(item => item.id)
 
     if (selectedTaskId.value !== null) {
-        const task = taskStore.taskCards.find(task => task.id === selectedTaskId.value)
-        if (task) {
-            // 将选中的图片对象添加到任务
-            selectedData.forEach(img => {
-                task.images.push({
-                    id: img.key,
-                    name: img.name,
-                    preview: img.preview,
-                    modified: img.modified
-                })
-            })
-            message.success(`成功添加 ${selectedData.length} 张图片`)
+        try {
+            const response = await request.post(`http://localhost:3000/api/images/task/${selectedTaskId.value}/add`, { imageIds })
+            const { data: { success, failed } } = response.data
+
+            if (success > 0) {
+                message.success(`成功添加 ${success} 张图片`)
+            } else {
+                message.error('没有图片被添加到任务')
+            }
+
+            if (failed > 0) {
+                message.warn(`有 ${failed} 张图片添加失败`)
+            }
+
+            // 更新 taskStore 如果需要
+        } catch (error) {
+            message.error('添加图片到任务失败')
+            console.error(error)
         }
     }
 
@@ -207,6 +208,23 @@ const confirmJoin = () => {
 const onSelectChange = (selectedRowKeys: string[]) => {
     state.selectedRowKeys = selectedRowKeys
 }
+
+onMounted(async () => {
+    try {
+        const response = await request.get('http://localhost:3000/api/images')
+        const images = response.data.data.images
+        data.value = images.map(img => ({
+            key: img.id.toString(),
+            name: img.filename,
+            preview: `http://localhost:3000/uploads/processed/${img.filename}`,
+            modified: new Date(img.upload_time),
+            id: img.id
+        }))
+    } catch (error) {
+        message.error('获取图片失败')
+        console.error(error)
+    }
+})
 </script>
 
 <style scoped>

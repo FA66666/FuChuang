@@ -13,7 +13,7 @@
                     <template #extra>
                         <!-- 下拉菜单 -->
                         <a-dropdown>
-                            <a class="ant-dropdown-link" @click.stop.prevent> <!-- 阻止事件冒泡 -->
+                            <a class="ant-dropdown-link" @click.stop.prevent>
                                 更多
                                 <DownOutlined />
                             </a>
@@ -29,7 +29,7 @@
                             </template>
                         </a-dropdown>
                     </template>
-                    <div @click="openTaskDetail(task.id)" class="card-content"> <!-- 添加点击区域 -->
+                    <div @click="openTaskDetail(task.id)" class="card-content">
                         <p>{{ task.content }}</p>
                         <div class="preview-images">
                             <a-tooltip v-for="(img, index) in task.images" :key="img.id" :title="img.name">
@@ -82,7 +82,8 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue'
+import axios from 'axios'
+import { ref, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { DownOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import { useTaskStore } from '../store/index'
@@ -167,12 +168,27 @@ const handleCancel = () => {
     taskName.value = ''
 }
 
-const createTask = () => {
+const createTask = async () => {
     const name = taskName.value.trim() || `任务${taskStore.taskCards.length + 1}`
-    taskStore.addTask(name, '')
-    isModalVisible.value = false
-    taskName.value = ''
-    message.success('任务创建成功')
+    try {
+        const token = localStorage.getItem('authToken') || ''
+        const response = await axios.post(
+            'http://localhost:3000/api/tasks',
+            { name },
+            { headers: { Authorization: `Bearer ${token}` } }
+        )
+        const createdTask = response.data.data
+        // 原有功能：添加任务卡片
+        taskStore.addTask(createdTask.name, createdTask.content || '')
+        // 覆盖生成的 id 为后端返回的 id
+        taskStore.taskCards[taskStore.taskCards.length - 1].id = createdTask.id
+        message.success('任务创建成功')
+    } catch (error: any) {
+        message.error(error.response?.data?.message || '任务创建失败')
+    } finally {
+        isModalVisible.value = false
+        taskName.value = ''
+    }
 }
 
 const showRenameModal = (id: number) => {
@@ -182,16 +198,28 @@ const showRenameModal = (id: number) => {
     isRenameModalVisible.value = true
 }
 
-const renameTask = () => {
+const renameTask = async () => {
     if (!newTaskName.value.trim()) {
         message.error('任务名称不能为空')
         return
     }
 
     if (currentTaskId.value !== null) {
-        taskStore.updateTask(currentTaskId.value, '', newTaskName.value)
-        isRenameModalVisible.value = false
-        message.success('任务重命名成功')
+        try {
+            const token = localStorage.getItem('authToken') || ''
+            await axios.patch(
+                `http://localhost:3000/api/tasks/${currentTaskId.value}/rename`,
+                { name: newTaskName.value },
+                { headers: { Authorization: `Bearer ${token}` } }
+            )
+            taskStore.updateTask(currentTaskId.value, '', newTaskName.value)
+            message.success('任务重命名成功')
+        } catch (error: any) {
+            message.error(error.response?.data?.message || '任务重命名失败')
+        } finally {
+            isRenameModalVisible.value = false
+            newTaskName.value = ''
+        }
     }
 }
 
@@ -204,9 +232,18 @@ const removeTaskCard = (id: number) => {
     Modal.confirm({
         title: '确定删除该任务？',
         content: '所有关联数据将被永久删除',
-        onOk: () => {
-            taskStore.removeTask(id)
-            message.success('任务删除成功')
+        onOk: async () => {
+            try {
+                const token = localStorage.getItem('authToken') || ''
+                await axios.delete(
+                    `http://localhost:3000/api/tasks/${id}`,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                )
+                taskStore.removeTask(id)
+                message.success('任务删除成功')
+            } catch (error: any) {
+                message.error(error.response?.data?.message || '任务删除失败')
+            }
         }
     })
 }
@@ -218,6 +255,31 @@ const handleMenuClick = (id: number, command: string) => {
         removeTaskCard(id)
     }
 }
+
+// 新增：登录成功后从后端加载所有任务
+onMounted(() => {
+    const token = localStorage.getItem('authToken') || ''
+    if (token) {
+        axios
+            .get('http://localhost:3000/api/tasks', {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            .then(response => {
+                const tasksFromServer = response.data.data.tasks || []
+                // 清空本地任务列表
+                taskStore.taskCards = []
+                tasksFromServer.forEach((serverTask: any) => {
+                    taskStore.addTask(serverTask.name, serverTask.content || '')
+                    // 覆盖本地生成的 id 为后端返回的 id
+                    taskStore.taskCards[taskStore.taskCards.length - 1].id = serverTask.id
+                })
+            })
+            .catch(err => {
+                console.error('加载任务失败', err)
+                message.error('加载任务失败')
+            })
+    }
+})
 </script>
 
 <style scoped>

@@ -142,11 +142,11 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 const openTaskDetail = (taskId: number) => {
     selectedTask.value = taskStore.taskCards.find(t => t.id === taskId) || null
     taskDetailVisible.value = true
-    fetchTaskImages(taskId)
+    fetchTaskImagesForTask(taskId)
 }
 
-// 新增：加载该任务中已有的图片
-const fetchTaskImages = async (taskId: number) => {
+// 新增：加载指定任务中已有的图片，并更新该任务的 images 属性
+const fetchTaskImagesForTask = async (taskId: number) => {
     try {
         const token = localStorage.getItem('authToken') || ''
         const response = await axios.get(
@@ -154,8 +154,10 @@ const fetchTaskImages = async (taskId: number) => {
             { headers: { Authorization: `Bearer ${token}` } }
         )
         const { images } = response.data.data
-        if (selectedTask.value) {
-            selectedTask.value.images = images.map((img: any) => ({
+        // 找到对应的任务卡片，并更新其 images 数组
+        const task = taskStore.taskCards.find(t => t.id === taskId)
+        if (task) {
+            task.images = images.map((img: any) => ({
                 id: img.id,
                 name: img.original_filename,
                 preview: `http://localhost:3000/api/processed/${img.filename}`,
@@ -419,15 +421,15 @@ const imageColumns = [
     }
 ]
 
-// 新增：从后端加载任务时（原有加载任务逻辑保持不变）
-onMounted(() => {
+// 新增：加载任务时（原有加载任务逻辑保持不变），并在加载完任务后对所有任务调用 fetchTaskImagesForTask
+onMounted(async () => {
     const token = localStorage.getItem('authToken') || ''
     if (token) {
         axios
             .get('http://localhost:3000/api/tasks', {
                 headers: { Authorization: `Bearer ${token}` }
             })
-            .then(response => {
+            .then(async response => {
                 const tasksFromServer = response.data.data.tasks || []
                 // 清空本地任务列表
                 taskStore.taskCards = []
@@ -436,6 +438,10 @@ onMounted(() => {
                     // 覆盖本地生成的 id 为后端返回的 id
                     taskStore.taskCards[taskStore.taskCards.length - 1].id = serverTask.id
                 })
+                // 新增：对所有任务卡片调用 fetchTaskImagesForTask 获取图片列表
+                for (const task of taskStore.taskCards) {
+                    await fetchTaskImagesForTask(task.id)
+                }
             })
             .catch(err => {
                 console.error('加载任务失败', err)

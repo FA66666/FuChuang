@@ -22,7 +22,12 @@
         <a-table :row-selection="{
             selectedRowKeys: state.selectedRowKeys,
             onChange: onSelectChange
-        }" :columns="columns" :data-source="data" row-key="key" bordered>
+        }" :columns="columns" :data-source="data" row-key="key" bordered :pagination="{
+            current: currentPage,
+            pageSize: pageSize,
+            total: total,
+            onChange: handlePageChange
+        }">
             <template #bodyCell="{ column, record }">
                 <template v-if="column.dataIndex === 'preview'">
                     <img :src="record.preview" class="preview-image" @click="handlePreview(record)" />
@@ -116,6 +121,11 @@ const state = reactive<{
 const previewVisible = ref(false)
 const currentPreview = ref('')
 
+// 新增分页相关变量
+const currentPage = ref(1)
+const pageSize = ref(6)
+const total = ref(0)
+
 const beforeUpload = (file: File) => {
     const isImage = file.type.startsWith('image/')
     const maxSize = 5 * 1024 * 1024 // 5MB
@@ -158,8 +168,10 @@ const handleUpload = async ({ file }: { file: File }) => {
             original_filename: uploadedImage.original_filename,
             task: uploadedImage.task ? { id: uploadedImage.task.id, name: uploadedImage.task.name } : null
         };
+        // 将新上传的图片添加到当前页面数据中
         data.value = [newItem, ...data.value];
         message.success('图片上传成功');
+        fetchImages();
     } catch (error) {
         message.error('图片上传失败');
         console.error(error)
@@ -191,8 +203,15 @@ const handleDelete = async (id: number) => {
 
 const fetchImages = async () => {
     try {
-        const response = await request.get('http://localhost:3000/api/images/')
-        const images = response.data.data.images
+        const response = await request.get('http://localhost:3000/api/images/', {
+            params: {
+                page: currentPage.value,
+                limit: pageSize.value
+            }
+        });
+        const images = response.data.data.images;
+        // 更新分页总数（后端返回 pagination.total）
+        total.value = response.data.data.pagination.total;
         data.value = images.map(img => ({
             key: img.id.toString(),
             name: img.original_filename,
@@ -206,6 +225,12 @@ const fetchImages = async () => {
         message.error('获取图片失败')
         console.error(error)
     }
+}
+
+const handlePageChange = (page: number, pageSizeValue: number) => {
+    currentPage.value = page;
+    pageSize.value = pageSizeValue;
+    fetchImages();
 }
 
 const hasSelected = computed(() => state.selectedRowKeys.length > 0)
@@ -265,8 +290,8 @@ onMounted(async () => {
 
 <style scoped>
 .preview-image {
-    width: 120px;
-    height: 90px;
+    width: 80px;
+    height: 60px;
     object-fit: cover;
     cursor: pointer;
     border-radius: 4px;

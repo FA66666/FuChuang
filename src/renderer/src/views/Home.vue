@@ -224,6 +224,8 @@ const handleUpload = async ({ file }: { file: File }) => {
         }
         taskStore.addTaskImage(selectedTask.value.id, newTaskImage)
         message.success('图片上传成功')
+        // 新增：导入图片后刷新该任务图片列表
+        fetchTaskImagesForTask(selectedTask.value.id)
     } catch (error) {
         message.error('图片上传失败')
         console.error('Upload error:', error)
@@ -366,7 +368,7 @@ const handlePreviewPageChange = (page: number, pageSizeValue: number) => {
     fetchMyImages()
 }
 
-// 新增：确认选中图片加入任务
+// 新增：确认选中图片加入任务，并在成功后刷新该任务的图片列表
 const confirmImageSelection = async () => {
     if (!selectedTask.value) return
     const selectedImages = myImages.value.filter(img =>
@@ -387,6 +389,8 @@ const confirmImageSelection = async () => {
         if (failed > 0) {
             message.warn(`有 ${failed} 张图片添加失败`)
         }
+        // 新增：导入图片后刷新该任务的图片列表
+        fetchTaskImagesForTask(selectedTask.value.id)
     } catch (error) {
         message.error('添加图片到任务失败')
         console.error(error)
@@ -438,7 +442,7 @@ onMounted(async () => {
                     // 覆盖本地生成的 id 为后端返回的 id
                     taskStore.taskCards[taskStore.taskCards.length - 1].id = serverTask.id
                 })
-                // 新增：对所有任务卡片调用 fetchTaskImagesForTask 获取图片列表
+                // 对所有任务卡片调用 fetchTaskImagesForTask 获取图片列表
                 for (const task of taskStore.taskCards) {
                     await fetchTaskImagesForTask(task.id)
                 }

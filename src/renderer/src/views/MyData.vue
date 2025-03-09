@@ -33,6 +33,9 @@
                 <template v-else-if="column.dataIndex === 'modified'">
                     {{ formatDate(record.modified) }}
                 </template>
+                <template v-else-if="column.dataIndex === 'action'">
+                    <a-button type="danger" @click="handleDelete(record.id)">删除</a-button>
+                </template>
             </template>
         </a-table>
 
@@ -67,6 +70,7 @@ interface ImageItem {
     modified: Date
     file?: File
     id: number
+    original_filename: string // 添加 original_filename
 }
 
 const columns = [
@@ -84,6 +88,11 @@ const columns = [
         title: '修改时间',
         dataIndex: 'modified',
         sorter: (a: ImageItem, b: ImageItem) => a.modified.getTime() - b.modified.getTime()
+    },
+    {
+        title: '操作',
+        dataIndex: 'action',
+        width: 100
     }
 ]
 
@@ -118,10 +127,9 @@ const beforeUpload = (file: File) => {
 const handleUpload = async ({ file }: { file: File }) => {
     const formData = new FormData();
     formData.append('image', file);
-    // 前端提供部分图片信息
     const imageInfo = {
-        filename: file.name, // 使用上传文件的原始名称
-        status: 'pending'   // 默认状态
+        filename: file.name, // 上传时的原始文件名
+        status: 'pending'
     };
     formData.append('imageInfo', JSON.stringify(imageInfo));
 
@@ -134,10 +142,11 @@ const handleUpload = async ({ file }: { file: File }) => {
         const uploadedImage = response.data.image;
         const newItem: ImageItem = {
             key: uploadedImage.id.toString(),
-            name: uploadedImage.filename,
-            preview: `http://localhost:3000/uploads/processed/${uploadedImage.filename}`,
+            name: uploadedImage.original_filename, // 使用原始文件名显示
+            preview: `http://localhost:3000/uploads/processed/${uploadedImage.filename}`, // 使用唯一文件名预览
             modified: new Date(uploadedImage.upload_time),
-            id: uploadedImage.id
+            id: uploadedImage.id,
+            original_filename: uploadedImage.original_filename // 确保包含
         };
         data.value = [newItem, ...data.value];
         message.success('图片上传成功');
@@ -205,20 +214,42 @@ const confirmJoin = async () => {
     isModalVisible.value = false
 }
 
+const handleDelete = async (id: number) => {
+    try {
+        await request.delete(`http://localhost:3000/api/images/${id}`)
+        message.success('图片删除成功')
+        // 刷新图片列表
+        const response = await request.get('http://localhost:3000/api/images/')
+        const images = response.data.data.images
+        data.value = images.map(img => ({
+            key: img.id.toString(),
+            name: img.original_filename,
+            preview: `http://localhost:3000/uploads/processed/${img.filename}`,
+            modified: new Date(img.upload_time),
+            id: img.id,
+            original_filename: img.original_filename
+        }))
+    } catch (error) {
+        message.error('图片删除失败')
+        console.error(error)
+    }
+}
+
 const onSelectChange = (selectedRowKeys: string[]) => {
     state.selectedRowKeys = selectedRowKeys
 }
 
 onMounted(async () => {
     try {
-        const response = await request.get('http://localhost:3000/api/images')
+        const response = await request.get('http://localhost:3000/api/images/')
         const images = response.data.data.images
         data.value = images.map(img => ({
             key: img.id.toString(),
-            name: img.filename,
-            preview: `http://localhost:3000/uploads/processed/${img.filename}`,
+            name: img.original_filename, // 使用原始文件名显示
+            preview: `http://localhost:3000/uploads/processed/${img.filename}`, // 使用唯一文件名预览
             modified: new Date(img.upload_time),
-            id: img.id
+            id: img.id,
+            original_filename: img.original_filename // 确保包含
         }))
     } catch (error) {
         message.error('获取图片失败')

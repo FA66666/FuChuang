@@ -33,6 +33,9 @@
                 <template v-else-if="column.dataIndex === 'modified'">
                     {{ formatDate(record.modified) }}
                 </template>
+                <template v-else-if="column.dataIndex === 'task'">
+                    {{ record.task ? record.task.name : '无任务' }}
+                </template>
                 <template v-else-if="column.dataIndex === 'action'">
                     <a-button type="danger" @click="handleDelete(record.id)">删除</a-button>
                 </template>
@@ -40,7 +43,7 @@
         </a-table>
 
         <!-- 图片预览模态框 -->
-        <a-modal :visible="previewVisible" :footer="null" @cancel="previewVisible = false" width="80%">
+        <a-modal v-model:open="previewVisible" :footer="null" width="80%">
             <img class="full-preview" :src="currentPreview" />
         </a-modal>
 
@@ -70,7 +73,8 @@ interface ImageItem {
     modified: Date
     file?: File
     id: number
-    original_filename: string // 添加 original_filename
+    original_filename: string
+    task?: { id: number, name: string } // 添加任务信息
 }
 
 const columns = [
@@ -88,6 +92,11 @@ const columns = [
         title: '修改时间',
         dataIndex: 'modified',
         sorter: (a: ImageItem, b: ImageItem) => a.modified.getTime() - b.modified.getTime()
+    },
+    {
+        title: '任务',
+        dataIndex: 'task',
+        render: (task) => task ? task.name : '无任务'
     },
     {
         title: '操作',
@@ -128,7 +137,7 @@ const handleUpload = async ({ file }: { file: File }) => {
     const formData = new FormData();
     formData.append('image', file);
     const imageInfo = {
-        filename: file.name, // 上传时的原始文件名
+        filename: file.name,
         status: 'pending'
     };
     formData.append('imageInfo', JSON.stringify(imageInfo));
@@ -142,17 +151,18 @@ const handleUpload = async ({ file }: { file: File }) => {
         const uploadedImage = response.data.image;
         const newItem: ImageItem = {
             key: uploadedImage.id.toString(),
-            name: uploadedImage.original_filename, // 使用原始文件名显示
-            preview: `http://localhost:3000/uploads/processed/${uploadedImage.filename}`, // 使用唯一文件名预览
+            name: uploadedImage.original_filename,
+            preview: `http://localhost:3000/api/processed/${uploadedImage.filename}`,
             modified: new Date(uploadedImage.upload_time),
             id: uploadedImage.id,
-            original_filename: uploadedImage.original_filename // 确保包含
+            original_filename: uploadedImage.original_filename,
+            task: uploadedImage.task ? { id: uploadedImage.task.id, name: uploadedImage.task.name } : null
         };
         data.value = [newItem, ...data.value];
         message.success('图片上传成功');
     } catch (error) {
         message.error('图片上传失败');
-        console.error(error);
+        console.error(error)
     }
 };
 
@@ -165,6 +175,37 @@ const formatDate = (date: Date) => {
 const handlePreview = (record: ImageItem) => {
     currentPreview.value = record.preview
     previewVisible.value = true
+}
+
+const handleDelete = async (id: number) => {
+    try {
+        await request.delete(`http://localhost:3000/api/images/${id}`)
+        message.success('图片删除成功')
+        // 刷新图片列表
+        await fetchImages()
+    } catch (error) {
+        message.error('图片删除失败')
+        console.error(error)
+    }
+}
+
+const fetchImages = async () => {
+    try {
+        const response = await request.get('http://localhost:3000/api/images/')
+        const images = response.data.data.images
+        data.value = images.map(img => ({
+            key: img.id.toString(),
+            name: img.original_filename,
+            preview: `http://localhost:3000/api/processed/${img.filename}`,
+            modified: new Date(img.upload_time),
+            id: img.id,
+            original_filename: img.original_filename,
+            task: img.task ? { id: img.task.id, name: img.task.name } : null
+        }))
+    } catch (error) {
+        message.error('获取图片失败')
+        console.error(error)
+    }
 }
 
 const hasSelected = computed(() => state.selectedRowKeys.length > 0)
@@ -194,6 +235,7 @@ const confirmJoin = async () => {
 
             if (success > 0) {
                 message.success(`成功添加 ${success} 张图片`)
+                await fetchImages() // 自动刷新图片列表
             } else {
                 message.error('没有图片被添加到任务')
             }
@@ -201,8 +243,6 @@ const confirmJoin = async () => {
             if (failed > 0) {
                 message.warn(`有 ${failed} 张图片添加失败`)
             }
-
-            // 更新 taskStore 如果需要
         } catch (error) {
             message.error('添加图片到任务失败')
             console.error(error)
@@ -214,47 +254,12 @@ const confirmJoin = async () => {
     isModalVisible.value = false
 }
 
-const handleDelete = async (id: number) => {
-    try {
-        await request.delete(`http://localhost:3000/api/images/${id}`)
-        message.success('图片删除成功')
-        // 刷新图片列表
-        const response = await request.get('http://localhost:3000/api/images/')
-        const images = response.data.data.images
-        data.value = images.map(img => ({
-            key: img.id.toString(),
-            name: img.original_filename,
-            preview: `http://localhost:3000/uploads/processed/${img.filename}`,
-            modified: new Date(img.upload_time),
-            id: img.id,
-            original_filename: img.original_filename
-        }))
-    } catch (error) {
-        message.error('图片删除失败')
-        console.error(error)
-    }
-}
-
 const onSelectChange = (selectedRowKeys: string[]) => {
     state.selectedRowKeys = selectedRowKeys
 }
 
 onMounted(async () => {
-    try {
-        const response = await request.get('http://localhost:3000/api/images/')
-        const images = response.data.data.images
-        data.value = images.map(img => ({
-            key: img.id.toString(),
-            name: img.original_filename, // 使用原始文件名显示
-            preview: `http://localhost:3000/uploads/processed/${img.filename}`, // 使用唯一文件名预览
-            modified: new Date(img.upload_time),
-            id: img.id,
-            original_filename: img.original_filename // 确保包含
-        }))
-    } catch (error) {
-        message.error('获取图片失败')
-        console.error(error)
-    }
+    await fetchImages()
 })
 </script>
 

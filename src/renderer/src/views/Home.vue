@@ -54,14 +54,15 @@
                     <a-col v-for="(image, index) in selectedTask?.images" :key="image.id" :span="6">
                         <div class="image-item">
                             <img :src="image.preview" class="preview-image" />
+                            <div class="image-name">{{ image.name }}</div>
                             <a-button type="danger" shape="circle" class="delete-btn" @click="removeImage(index)">
                                 <DeleteOutlined />
                             </a-button>
                         </div>
                     </a-col>
                 </a-row>
-                <!-- 新增：导入图片按钮 -->
-                <div style="margin-top: 16px; text-align: center;">
+                <!-- 导入图片按钮 -->
+                <div class="import-btn-container">
                     <a-button type="dashed" @click="openImportModal">
                         <UploadOutlined /> 导入图片
                     </a-button>
@@ -140,7 +141,7 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 
 // 修改：点击任务卡片时，打开任务详情模态框并加载该任务的图片
 const openTaskDetail = (taskId: number) => {
-    selectedTask.value = taskStore.taskCards.find(t => t.id === taskId) || null
+    selectedTask.value = taskStore.taskCards.find((t) => t.id === taskId) || null
     taskDetailVisible.value = true
     fetchTaskImagesForTask(taskId)
 }
@@ -155,7 +156,7 @@ const fetchTaskImagesForTask = async (taskId: number) => {
         )
         const { images } = response.data.data
         // 找到对应的任务卡片，并更新其 images 数组
-        const task = taskStore.taskCards.find(t => t.id === taskId)
+        const task = taskStore.taskCards.find((t) => t.id === taskId)
         if (task) {
             task.images = images.map((img: any) => ({
                 id: img.id,
@@ -255,7 +256,7 @@ const createTask = async () => {
         const createdTask = response.data.data
         // 原有功能：添加任务卡片
         taskStore.addTask(createdTask.name, createdTask.content || '')
-        // 覆盖生成的 id 为后端返回的 id
+        // 覆盖本地生成的 id 为后端返回的 id
         taskStore.taskCards[taskStore.taskCards.length - 1].id = createdTask.id
         message.success('任务创建成功')
     } catch (error: any) {
@@ -268,7 +269,7 @@ const createTask = async () => {
 
 const showRenameModal = (id: number) => {
     currentTaskId.value = id
-    const task = taskStore.taskCards.find(task => task.id === id)
+    const task = taskStore.taskCards.find((task) => task.id === id)
     newTaskName.value = task?.name || ''
     isRenameModalVisible.value = true
 }
@@ -341,7 +342,7 @@ const fetchMyImages = async () => {
         })
         const images = response.data.data.images
         previewTotal.value = response.data.data.pagination.total
-        myImages.value = images.map(img => ({
+        myImages.value = images.map((img: any) => ({
             key: img.id.toString(),
             name: img.original_filename,
             preview: `http://localhost:3000/api/processed/${img.filename}`,
@@ -371,16 +372,18 @@ const handlePreviewPageChange = (page: number, pageSizeValue: number) => {
 // 新增：确认选中图片加入任务，并在成功后刷新该任务的图片列表
 const confirmImageSelection = async () => {
     if (!selectedTask.value) return
-    const selectedImages = myImages.value.filter(img =>
+    const selectedImages = myImages.value.filter((img: any) =>
         selectedImageKeys.value.includes(img.key)
     )
-    const imageIds = selectedImages.map(img => img.id)
+    const imageIds = selectedImages.map((img: any) => img.id)
     try {
         const response = await request.post(
             `http://localhost:3000/api/images/task/${selectedTask.value.id}/add`,
             { imageIds }
         )
-        const { data: { success, failed } } = response.data
+        const {
+            data: { success, failed }
+        } = response.data
         if (success > 0) {
             message.success(`成功添加 ${success} 张图片`)
         } else {
@@ -433,7 +436,7 @@ onMounted(async () => {
             .get('http://localhost:3000/api/tasks', {
                 headers: { Authorization: `Bearer ${token}` }
             })
-            .then(async response => {
+            .then(async (response) => {
                 const tasksFromServer = response.data.data.tasks || []
                 // 清空本地任务列表
                 taskStore.taskCards = []
@@ -447,7 +450,7 @@ onMounted(async () => {
                     await fetchTaskImagesForTask(task.id)
                 }
             })
-            .catch(err => {
+            .catch((err) => {
                 console.error('加载任务失败', err)
                 message.error('加载任务失败')
             })
@@ -491,37 +494,69 @@ onMounted(async () => {
     border: 1px solid #ddd;
 }
 
+/* 新增预览框样式 */
 .image-manager {
+    padding: 16px;
+    background-color: #f7f7f7;
+    border-radius: 8px;
     max-height: 60vh;
     overflow-y: auto;
 }
 
-.preview-image {
-    width: 80px;
-    height: 60px;
-    object-fit: cover;
-    border-radius: 8px;
-    border: 1px solid #ddd;
-}
-
 .image-item {
     position: relative;
-    transition: transform 0.2s;
+    padding: 12px;
+    background-color: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    text-align: center;
+    transition: box-shadow 0.3s ease;
 }
 
 .image-item:hover {
-    transform: scale(0.98);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.preview-image {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+.image-name {
+    margin-top: 8px;
+    font-size: 16px;
+    color: #333;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .delete-btn {
     position: absolute;
     top: 8px;
     right: 8px;
-    opacity: 0.7;
+    opacity: 0.8;
+    transition: opacity 0.3s ease;
 }
 
 .delete-btn:hover {
     opacity: 1;
+}
+
+.import-btn-container {
+    margin-top: 16px;
+    text-align: center;
+}
+
+.more-count {
+    background: rgba(0, 0, 0, 0.65);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
 }
 
 .thumbnail {
@@ -531,13 +566,5 @@ onMounted(async () => {
     border-radius: 4px;
     margin-right: 8px;
     border: 1px solid #f0f0f0;
-}
-
-.more-count {
-    background: rgba(0, 0, 0, 0.65);
-    color: white;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 12px;
 }
 </style>

@@ -32,12 +32,12 @@
             <a-card title="用户管理" style="margin-top: 20px">
                 <div class="user-management-toolbar">
                     <a-input-search v-model:value="searchQuery" placeholder="搜索用户..." style="width: 300px" />
-                    <a-button type="primary" @click="showUserModal">
+                    <!-- <a-button type="primary" @click="showUserModal">
                         <template #icon>
                             <PlusOutlined />
                         </template>
-                        新建用户
-                    </a-button>
+新建用户
+</a-button> -->
                 </div>
 
                 <a-table :columns="userColumns" :data-source="filteredUsers" :pagination="{ pageSize: 8 }"

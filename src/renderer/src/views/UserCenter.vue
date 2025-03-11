@@ -2,6 +2,7 @@
     <div class="user-center">
         <a-page-header title="用户中心" :sub-title="userStore.isAdmin ? '管理员控制面板' : '个人中心'">
             <template #extra>
+                <!-- 修改：仅管理员可见 -->
                 <a-button v-if="userStore.isAdmin" type="primary" @click="showApiKeyModal">
                     <template #icon>
                         <KeyOutlined />
@@ -25,18 +26,18 @@
             </a-descriptions>
         </a-card>
 
-        <!-- 管理员面板 -->
+        <!-- 管理员面板：只有管理员才显示 -->
         <template v-if="userStore.isAdmin">
             <!-- 用户管理 -->
             <a-card title="用户管理" style="margin-top: 20px">
                 <div class="user-management-toolbar">
                     <a-input-search v-model:value="searchQuery" placeholder="搜索用户..." style="width: 300px" />
-                    <a-button type="primary" @click="showUserModal">
+                    <!-- <a-button type="primary" @click="showUserModal">
                         <template #icon>
                             <PlusOutlined />
                         </template>
-                        新建用户
-                    </a-button>
+新建用户
+</a-button> -->
                 </div>
 
                 <a-table :columns="userColumns" :data-source="filteredUsers" :pagination="{ pageSize: 8 }"
@@ -109,7 +110,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, onMounted } from 'vue'
 import { KeyOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import { useUserStore } from '../store/userStore'
@@ -117,6 +118,13 @@ import type { User, ApiKey } from '../store/userStore'
 
 const userStore = useUserStore()
 const currentUser = computed(() => userStore.currentUser!)
+
+// 若为管理员，组件挂载时从后端获取用户列表
+onMounted(() => {
+    if (userStore.isAdmin) {
+        userStore.fetchUsers()
+    }
+})
 
 // 用户管理相关状态
 const searchQuery = ref('')
@@ -166,13 +174,13 @@ const showUserModal = (user?: User) => {
     userModal.visible = true
 }
 
-const handleUserSubmit = () => {
+const handleUserSubmit = async () => {
     try {
         if (userModal.isEditing) {
-            userStore.updateUser({ ...userForm })
+            await userStore.updateUser({ ...userForm })
             message.success('用户信息已更新')
         } else {
-            userStore.register(userForm.username, userForm.password, userForm.isAdmin)
+            await userStore.register(userForm.username, userForm.password)
             message.success('用户创建成功')
         }
         closeUserModal()
@@ -181,9 +189,9 @@ const handleUserSubmit = () => {
     }
 }
 
-const deleteUser = (userId: string) => {
+const deleteUser = async (userId: string) => {
     try {
-        userStore.deleteUser(userId)
+        await userStore.deleteUser(userId)
         message.success('用户已删除')
     } catch (error) {
         message.error(error instanceof Error ? error.message : '删除失败')
@@ -198,9 +206,9 @@ const handlePermissionChange = (user: User, isAdmin: boolean) => {
     Modal.confirm({
         title: '确认修改权限',
         content: `确定要将用户 ${user.username} 设为${isAdmin ? '管理员' : '普通用户'}吗？`,
-        onOk: () => {
+        onOk: async () => {
             try {
-                userStore.updateUser({ ...user, isAdmin })
+                await userStore.updateUser({ ...user, isAdmin })
                 message.success('权限已更新')
             } catch (error) {
                 message.error(error instanceof Error ? error.message : '操作失败')

@@ -22,7 +22,12 @@
         <a-table :row-selection="{
             selectedRowKeys: state.selectedRowKeys,
             onChange: onSelectChange
-        }" :columns="columns" :data-source="data" row-key="key" bordered>
+        }" :columns="columns" :data-source="data" row-key="key" bordered :pagination="{
+            current: currentPage,
+            pageSize: pageSize,
+            total: total,
+            onChange: handlePageChange
+        }">
             <template #bodyCell="{ column, record }">
                 <template v-if="column.dataIndex === 'preview'">
                     <img :src="record.preview" class="preview-image" @click="handlePreview(record)" />
@@ -33,11 +38,17 @@
                 <template v-else-if="column.dataIndex === 'modified'">
                     {{ formatDate(record.modified) }}
                 </template>
+                <template v-else-if="column.dataIndex === 'task'">
+                    {{ record.task ? record.task.name : '无任务' }}
+                </template>
+                <template v-else-if="column.dataIndex === 'action'">
+                    <a-button type="danger" @click="handleDelete(record.id)">删除</a-button>
+                </template>
             </template>
         </a-table>
 
         <!-- 图片预览模态框 -->
-        <a-modal :visible="previewVisible" :footer="null" @cancel="previewVisible = false" width="80%">
+        <a-modal v-model:open="previewVisible" :footer="null" width="80%">
             <img class="full-preview" :src="currentPreview" />
         </a-modal>
 
@@ -54,20 +65,23 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { UploadOutlined } from '@ant-design/icons-vue'
 import { useTaskStore } from '../store/index'
+import request from '../utils/request'
 
 interface ImageItem {
     key: string
     name: string
-    preview: string  // base64或图片URL
+    preview: string
     modified: Date
     file?: File
+    id: number
+    original_filename: string
+    task?: { id: number, name: string } // 添加任务信息
 }
 
-// 表格列配置
 const columns = [
     {
         title: '图片预览',
@@ -83,37 +97,35 @@ const columns = [
         title: '修改时间',
         dataIndex: 'modified',
         sorter: (a: ImageItem, b: ImageItem) => a.modified.getTime() - b.modified.getTime()
+    },
+    {
+        title: '任务',
+        dataIndex: 'task',
+        render: (task) => task ? task.name : '无任务'
+    },
+    {
+        title: '操作',
+        dataIndex: 'action',
+        width: 100
     }
 ]
 
-// 图片数据（初始化示例）
-const data = ref<ImageItem[]>([
-    {
-        key: '1',
-        name: '示例图片1.jpg',
-        preview: 'https://picsum.photos/200/150?random=1',
-        modified: new Date()
-    },
-    {
-        key: '2',
-        name: '示例图片2.png',
-        preview: 'https://picsum.photos/200/150?random=2',
-        modified: new Date(Date.now() - 86400000)
-    }
-])
+const data = ref<ImageItem[]>([])
 
-// 表格选中状态
 const state = reactive<{
     selectedRowKeys: string[]
 }>({
     selectedRowKeys: []
 })
 
-// 图片预览相关状态
 const previewVisible = ref(false)
 const currentPreview = ref('')
 
-// 上传处理
+// 新增分页相关变量
+const currentPage = ref(1)
+const pageSize = ref(6)
+const total = ref(0)
+
 const beforeUpload = (file: File) => {
     const isImage = file.type.startsWith('image/')
     const maxSize = 5 * 1024 * 1024 // 5MB
@@ -132,38 +144,95 @@ const beforeUpload = (file: File) => {
 }
 
 const handleUpload = async ({ file }: { file: File }) => {
-    const reader = new FileReader()
+    const formData = new FormData();
+    formData.append('image', file);
+    const imageInfo = {
+        filename: file.name,
+        status: 'pending'
+    };
+    formData.append('imageInfo', JSON.stringify(imageInfo));
 
-    reader.onload = (e) => {
+    try {
+        const response = await request.post('http://localhost:3000/api/images/upload', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        const uploadedImage = response.data.image;
         const newItem: ImageItem = {
-            key: Date.now().toString(),
-            name: file.name,
-            preview: e.target?.result as string,
-            modified: new Date(),
-            file: file
-        }
-
-        data.value = [newItem, ...data.value]
-        message.success('图片上传成功')
+            key: uploadedImage.id.toString(),
+            name: uploadedImage.original_filename,
+            preview: `http://localhost:3000/api/processed/${uploadedImage.filename}`,
+            modified: new Date(uploadedImage.upload_time),
+            id: uploadedImage.id,
+            original_filename: uploadedImage.original_filename,
+            task: uploadedImage.task ? { id: uploadedImage.task.id, name: uploadedImage.task.name } : null
+        };
+        // 将新上传的图片添加到当前页面数据中
+        data.value = [newItem, ...data.value];
+        message.success('图片上传成功');
+        fetchImages();
+    } catch (error) {
+        message.error('图片上传失败');
+        console.error(error)
     }
+};
 
-    reader.readAsDataURL(file)
-}
-
-// 日期格式化
 const formatDate = (date: Date) => {
     return `${date.getFullYear()}-${(date.getMonth() + 1)
         .toString()
         .padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`
 }
 
-// 图片预览处理
 const handlePreview = (record: ImageItem) => {
     currentPreview.value = record.preview
     previewVisible.value = true
 }
 
-// 其他原有逻辑保持不变...
+const handleDelete = async (id: number) => {
+    try {
+        await request.delete(`http://localhost:3000/api/images/${id}`)
+        message.success('图片删除成功')
+        // 刷新图片列表
+        await fetchImages()
+    } catch (error) {
+        message.error('图片删除失败')
+        console.error(error)
+    }
+}
+
+const fetchImages = async () => {
+    try {
+        const response = await request.get('http://localhost:3000/api/images/', {
+            params: {
+                page: currentPage.value,
+                limit: pageSize.value
+            }
+        });
+        const images = response.data.data.images;
+        // 更新分页总数（后端返回 pagination.total）
+        total.value = response.data.data.pagination.total;
+        data.value = images.map(img => ({
+            key: img.id.toString(),
+            name: img.original_filename,
+            preview: `http://localhost:3000/api/processed/${img.filename}`,
+            modified: new Date(img.upload_time),
+            id: img.id,
+            original_filename: img.original_filename,
+            task: img.task ? { id: img.task.id, name: img.task.name } : null
+        }))
+    } catch (error) {
+        message.error('获取图片失败')
+        console.error(error)
+    }
+}
+
+const handlePageChange = (page: number, pageSizeValue: number) => {
+    currentPage.value = page;
+    pageSize.value = pageSizeValue;
+    fetchImages();
+}
+
 const hasSelected = computed(() => state.selectedRowKeys.length > 0)
 const taskStore = useTaskStore()
 const isModalVisible = ref(false)
@@ -178,24 +247,30 @@ const cancelJoin = () => {
     selectedTaskId.value = null
 }
 
-const confirmJoin = () => {
+const confirmJoin = async () => {
     const selectedData = data.value.filter(item =>
         state.selectedRowKeys.includes(item.key)
     )
+    const imageIds = selectedData.map(item => item.id)
 
     if (selectedTaskId.value !== null) {
-        const task = taskStore.taskCards.find(task => task.id === selectedTaskId.value)
-        if (task) {
-            // 将选中的图片对象添加到任务
-            selectedData.forEach(img => {
-                task.images.push({
-                    id: img.key,
-                    name: img.name,
-                    preview: img.preview,
-                    modified: img.modified
-                })
-            })
-            message.success(`成功添加 ${selectedData.length} 张图片`)
+        try {
+            const response = await request.post(`http://localhost:3000/api/images/task/${selectedTaskId.value}/add`, { imageIds })
+            const { data: { success, failed } } = response.data
+
+            if (success > 0) {
+                message.success(`成功添加 ${success} 张图片`)
+                await fetchImages() // 自动刷新图片列表
+            } else {
+                message.error('没有图片被添加到任务')
+            }
+
+            if (failed > 0) {
+                message.warn(`有 ${failed} 张图片添加失败`)
+            }
+        } catch (error) {
+            message.error('添加图片到任务失败')
+            console.error(error)
         }
     }
 
@@ -207,12 +282,16 @@ const confirmJoin = () => {
 const onSelectChange = (selectedRowKeys: string[]) => {
     state.selectedRowKeys = selectedRowKeys
 }
+
+onMounted(async () => {
+    await fetchImages()
+})
 </script>
 
 <style scoped>
 .preview-image {
-    width: 120px;
-    height: 90px;
+    width: 80px;
+    height: 60px;
     object-fit: cover;
     cursor: pointer;
     border-radius: 4px;

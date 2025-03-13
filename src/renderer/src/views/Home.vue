@@ -59,30 +59,40 @@
       </div>
     </div>
 
-    <!-- 任务详情模态框：展示任务图片及管理操作 -->
+    <!-- 任务详情模态框：优化图片展示样式 -->
     <a-modal
       v-model:visible="taskDetailVisible"
       :title="selectedTask?.name"
       width="80%"
       @ok="taskDetailVisible = false"
       :ok-button-props="{ style: { display: 'none' } }"
+      class="task-detail-modal"
     >
       <div class="image-manager">
-        <!-- 展示任务中已存在的图片 -->
         <a-row :gutter="[16, 16]">
           <a-col v-for="(image, index) in selectedTask?.images" :key="image.id" :span="6">
-            <div class="image-item">
-              <img :src="image.preview" class="preview-image" />
-              <div class="image-name">{{ image.name }}</div>
-              <a-button type="danger" shape="circle" class="delete-btn" @click="removeImage(index)">
-                <DeleteOutlined />
-              </a-button>
+            <div class="detail-image-item">
+              <div class="detail-image-wrapper">
+                <img :src="image.preview" class="detail-preview-image" />
+                <div class="image-overlay">
+                  <a-button
+                    type="danger"
+                    shape="circle"
+                    class="delete-btn"
+                    @click="removeImage(index)"
+                  >
+                    <delete-outlined />
+                  </a-button>
+                </div>
+              </div>
+              <div class="detail-image-name">{{ image.name }}</div>
             </div>
           </a-col>
         </a-row>
-        <!-- 按钮：导入图片 -->
         <div class="import-btn-container">
-          <a-button type="dashed" @click="openImportModal"> <UploadOutlined /> 导入图片 </a-button>
+          <a-button type="dashed" @click="openImportModal" class="import-button">
+            <upload-outlined /> 导入图片
+          </a-button>
         </div>
       </div>
     </a-modal>
@@ -118,14 +128,14 @@
       />
     </a-modal>
 
-    <!-- 图片选择模态框：从"我的数据"中选择图片并支持分页 -->
+    <!-- 图片选择模态框：优化表格中的图片大小 -->
     <a-modal
       v-model:open="isImageSelectModalVisible"
       title="选择图片加入任务"
       @ok="confirmImageSelection"
       @cancel="cancelImageSelection"
       width="80%"
-      :bodyStyle="{ maxHeight: '400px', overflowY: 'auto' }"
+      class="image-select-modal"
     >
       <a-table
         :row-selection="{
@@ -145,7 +155,9 @@
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.dataIndex === 'preview'">
-            <img :src="record.preview" class="preview-image" />
+            <div class="table-image-wrapper">
+              <img :src="record.preview" class="table-preview-image" />
+            </div>
           </template>
           <template v-else>
             {{ record[column.dataIndex] }}
@@ -730,5 +742,142 @@ onMounted(async () => {
 .task-card-wrapper {
   animation: fadeIn 0.5s ease forwards;
   animation-delay: calc(var(--index, 0) * 0.1s);
+}
+
+/* 任务详情模态框样式 */
+.detail-image-item {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.detail-image-wrapper {
+  position: relative;
+  width: 100%;
+  padding-top: 75%; /* 4:3 宽高比 */
+  overflow: hidden;
+}
+
+.detail-preview-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.detail-image-item:hover .detail-preview-image {
+  transform: scale(1.05);
+}
+
+.image-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.detail-image-item:hover .image-overlay {
+  opacity: 1;
+}
+
+.detail-image-name {
+  padding: 8px;
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.delete-btn {
+  background: #ff4d4f;
+  border-color: #ff4d4f;
+  color: white;
+}
+
+.delete-btn:hover {
+  background: #ff7875;
+  border-color: #ff7875;
+}
+
+.import-btn-container {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.import-button {
+  height: 40px;
+  padding: 0 32px;
+}
+
+/* 图片选择模态框样式 */
+.table-image-wrapper {
+  width: 120px;
+  height: 90px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #f5f5f5;
+}
+
+.table-preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.table-image-wrapper:hover .table-preview-image {
+  transform: scale(1.05);
+}
+
+/* 修改表格列宽度 */
+:deep(.ant-table) {
+  font-size: 14px;
+}
+
+:deep(.ant-table-cell) {
+  padding: 12px !important;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .detail-image-item {
+    margin-bottom: 16px;
+  }
+
+  :deep(.ant-col) {
+    flex: 0 0 50%;
+    max-width: 50%;
+  }
+}
+
+/* 添加过渡动画 */
+.task-detail-modal :deep(.ant-modal-content),
+.image-select-modal :deep(.ant-modal-content) {
+  animation: modalZoom 0.3s ease;
+}
+
+@keyframes modalZoom {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 </style>

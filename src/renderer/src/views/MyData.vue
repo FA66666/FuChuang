@@ -188,7 +188,8 @@ const columns = [
   {
     title: '图片预览',
     dataIndex: 'preview',
-    width: 150
+    width: 150,
+    fixed: 'left'
   },
   {
     title: '图片名称',
@@ -201,14 +202,10 @@ const columns = [
     sorter: (a: ImageItem, b: ImageItem) => a.modified.getTime() - b.modified.getTime()
   },
   {
-    title: '任务',
-    dataIndex: 'task',
-    render: (task) => (task ? task.name : '无任务')
-  },
-  {
     title: '操作',
     dataIndex: 'action',
-    width: 100
+    width: 100,
+    fixed: 'right'
   }
 ]
 
@@ -488,6 +485,8 @@ onMounted(async () => {
   padding: 24px;
   background: #f5f7fa;
   min-height: 100vh;
+  position: relative;
+  z-index: 0;
 }
 
 .page-header {
@@ -495,6 +494,8 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 32px;
+  position: relative;
+  z-index: 5;
 }
 
 .header-left {
@@ -562,6 +563,8 @@ onMounted(async () => {
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  position: relative;
+  z-index: 1;
 }
 
 .image-preview-cell {
@@ -569,7 +572,7 @@ onMounted(async () => {
   display: flex;
   justify-content: center;
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 .image-preview-wrapper {
@@ -579,6 +582,7 @@ onMounted(async () => {
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
+  z-index: 2;
 }
 
 .preview-image {
@@ -675,6 +679,8 @@ onMounted(async () => {
       transform: rotate(90deg);
     }
   }
+
+  z-index: 1000;
 }
 
 .preview-container {
@@ -829,5 +835,67 @@ onMounted(async () => {
 
 :deep(.ant-table-row-selected:hover) > td {
   background: #e6f7ff !important;
+}
+
+/* 确保固定列的层级正确 */
+:deep(.ant-table-cell-fix-left),
+:deep(.ant-table-cell-fix-right) {
+  z-index: 3 !important;
+}
+
+/* 修改表格滚动容器样式 */
+:deep(.ant-table-content) {
+  overflow: auto;
+  position: relative;
+  z-index: 1;
+}
+
+/* 确保表格头部固定且层级正确 */
+:deep(.ant-table-header) {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: white;
+}
+
+/* 调整页面容器样式 */
+.data-container {
+  padding: 24px;
+  background: #f5f7fa;
+  min-height: 100vh;
+  position: relative;
+  z-index: 0;
+}
+
+/* 确保头部操作栏在正确的层级 */
+.page-header {
+  position: relative;
+  z-index: 5;
+  margin-bottom: 32px;
+}
+
+/* 调整模态框层级 */
+:deep(.ant-modal-mask),
+:deep(.ant-modal-wrap) {
+  z-index: 1001;
+}
+
+/* 添加表格滚动阴影效果 */
+.table-container::after {
+  content: '';
+  position: fixed;
+  top: 64px;
+  left: 0;
+  right: 0;
+  height: 24px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.1), transparent);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+  z-index: 2;
+}
+
+.table-container.scrolled::after {
+  opacity: 1;
 }
 </style>

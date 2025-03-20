@@ -35,11 +35,7 @@
           <div @click="openTaskDetail(task.id)" class="card-content">
             <p class="task-description">{{ task.content || '暂无描述' }}</p>
             <div class="preview-images">
-              <a-tooltip
-                v-for="(img, index) in task.images.slice(0, 3)"
-                :key="img.id"
-                :title="img.name"
-              >
+              <a-tooltip v-for="(img) in task.images.slice(0, 3)" :key="img.id" :title="img.name">
                 <div class="image-wrapper">
                   <img :src="img.preview" class="thumbnail" />
                 </div>
@@ -60,14 +56,8 @@
     </div>
 
     <!-- 任务详情模态框：优化图片展示样式 -->
-    <a-modal
-      v-model:visible="taskDetailVisible"
-      :title="selectedTask?.name"
-      width="80%"
-      @ok="taskDetailVisible = false"
-      :ok-button-props="{ style: { display: 'none' } }"
-      class="task-detail-modal"
-    >
+    <a-modal v-model:visible="taskDetailVisible" :title="selectedTask?.name" width="80%" @ok="taskDetailVisible = false"
+      :ok-button-props="{ style: { display: 'none' } }" class="task-detail-modal">
       <div class="image-manager">
         <a-row :gutter="[16, 16]">
           <a-col v-for="(image, index) in selectedTask?.images" :key="image.id" :span="6">
@@ -75,12 +65,7 @@
               <div class="detail-image-wrapper">
                 <img :src="image.preview" class="detail-preview-image" />
                 <div class="image-overlay">
-                  <a-button
-                    type="danger"
-                    shape="circle"
-                    class="delete-btn"
-                    @click="removeImage(index)"
-                  >
+                  <a-button type="danger" shape="circle" class="delete-btn" @click="removeImage(index)">
                     <delete-outlined />
                   </a-button>
                 </div>
@@ -98,61 +83,27 @@
     </a-modal>
 
     <!-- 新建任务模态框 -->
-    <a-modal
-      v-model:visible="isModalVisible"
-      title="请输入任务名称"
-      @ok="createTask"
-      @cancel="handleCancel"
-    >
-      <a-input
-        v-model:value="taskName"
-        placeholder="输入任务名称"
-        @keydown.enter="createTask"
-        :maxlength="20"
-        show-count
-      />
+    <a-modal v-model:visible="isModalVisible" title="请输入任务名称" @ok="createTask" @cancel="handleCancel">
+      <a-input v-model:value="taskName" placeholder="输入任务名称" @keydown.enter="createTask" :maxlength="20" show-count />
     </a-modal>
 
     <!-- 任务重命名模态框 -->
-    <a-modal
-      v-model:visible="isRenameModalVisible"
-      title="重命名任务"
-      @ok="renameTask"
-      @cancel="handleRenameCancel"
-    >
-      <a-input
-        v-model:value="newTaskName"
-        placeholder="输入新任务名称"
-        :maxlength="20"
-        show-count
-      />
+    <a-modal v-model:visible="isRenameModalVisible" title="重命名任务" @ok="renameTask" @cancel="handleRenameCancel">
+      <a-input v-model:value="newTaskName" placeholder="输入新任务名称" :maxlength="20" show-count />
     </a-modal>
 
     <!-- 图片选择模态框：优化表格中的图片大小 -->
-    <a-modal
-      v-model:open="isImageSelectModalVisible"
-      title="选择图片加入任务"
-      @ok="confirmImageSelection"
-      @cancel="cancelImageSelection"
-      width="80%"
-      class="image-select-modal"
-    >
-      <a-table
-        :row-selection="{
-          selectedRowKeys: selectedImageKeys,
-          onChange: onSelectImageChange
-        }"
-        :columns="imageColumns"
-        :data-source="myImages"
-        row-key="key"
-        bordered
-        :pagination="{
-          current: previewCurrentPage,
-          pageSize: previewPageSize,
-          total: previewTotal,
-          onChange: handlePreviewPageChange
-        }"
-      >
+    <a-modal v-model:open="isImageSelectModalVisible" title="选择图片加入任务" @ok="confirmImageSelection"
+      @cancel="cancelImageSelection" width="80%" class="image-select-modal">
+      <a-table :row-selection="{
+        selectedRowKeys: selectedImageKeys,
+        onChange: onSelectImageChange
+      }" :columns="imageColumns" :data-source="myImages" row-key="key" bordered :pagination="{
+        current: previewCurrentPage,
+        pageSize: previewPageSize,
+        total: previewTotal,
+        onChange: handlePreviewPageChange
+      }">
         <template #bodyCell="{ column, record }">
           <template v-if="column.dataIndex === 'preview'">
             <div class="table-image-wrapper">
@@ -173,7 +124,6 @@ import axios from 'axios'
 import { ref, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import {
-  DownOutlined,
   DeleteOutlined,
   UploadOutlined,
   PlusOutlined,
@@ -204,7 +154,7 @@ const selectedImageKeys = ref<string[]>([]) // 当前选中图片的键集合
 
 // 分页状态：用于图片选择模态框的分页控制
 const previewCurrentPage = ref(1) // 当前图片预览页码
-const previewPageSize = ref(5) // 每页显示的图片数量
+const previewPageSize = ref(4) // 每页显示的图片数量
 const previewTotal = ref(0) // 图片总数
 
 // 处理点击任务卡片：显示任务详情并加载对应图片
@@ -733,6 +683,7 @@ onMounted(async () => {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -756,7 +707,8 @@ onMounted(async () => {
 .detail-image-wrapper {
   position: relative;
   width: 100%;
-  padding-top: 75%; /* 4:3 宽高比 */
+  padding-top: 75%;
+  /* 4:3 宽高比 */
   overflow: hidden;
 }
 
@@ -875,6 +827,7 @@ onMounted(async () => {
     transform: scale(0.95);
     opacity: 0;
   }
+
   to {
     transform: scale(1);
     opacity: 1;
